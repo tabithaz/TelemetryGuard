@@ -17,7 +17,8 @@ struct TelemetryReading {
 
 enum class TelemetryStatus {
     Nominal,
-    OutOfRange,
+    Warning,
+    Critical,
     Stale,
     MissingData
 };
@@ -32,7 +33,15 @@ TelemetryStatus evaluateReading(const TelemetryReading& reading) {
     }
 
     if (reading.value < reading.minimum || reading.value > reading.maximum) {
-        return TelemetryStatus::OutOfRange;
+        const double operatingRange = reading.maximum - reading.minimum;
+        const double criticalMargin = operatingRange * 0.10;
+
+        if (reading.value < reading.minimum - criticalMargin ||
+            reading.value > reading.maximum + criticalMargin) {
+            return TelemetryStatus::Critical;
+        }
+
+        return TelemetryStatus::Warning;
     }
 
     return TelemetryStatus::Nominal;
@@ -42,8 +51,10 @@ std::string statusLabel(TelemetryStatus status) {
     switch (status) {
         case TelemetryStatus::Nominal:
             return "NOMINAL";
-        case TelemetryStatus::OutOfRange:
-            return "ALERT";
+        case TelemetryStatus::Warning:
+            return "WARNING";
+        case TelemetryStatus::Critical:
+            return "CRITICAL";
         case TelemetryStatus::Stale:
             return "STALE";
         case TelemetryStatus::MissingData:
@@ -59,13 +70,14 @@ int main() {
         {"Velocity", 1240.0, 0.0, 1800.0, "m/s", 0.7, 2.0},
         {"Temperature", 91.5, -40.0, 85.0, "C", 0.3, 5.0},
         {"Pressure", 238.0, 150.0, 300.0, "kPa", 6.2, 5.0},
-        {"Battery Voltage", 27.8, 24.0, 30.0, "V", 1.1, 5.0},
+        {"Battery Voltage", 33.5, 24.0, 30.0, "V", 1.1, 5.0},
         {"Fuel Level", std::numeric_limits<double>::quiet_NaN(), 0.0, 100.0, "%", 0.8, 5.0}
     };
 
     std::cout << "TelemetryGuard - Vehicle Health Check\n\n";
 
-    int alertCount = 0;
+    int warningCount = 0;
+    int criticalCount = 0;
     int staleCount = 0;
     int missingDataCount = 0;
 
@@ -85,8 +97,10 @@ int main() {
                   << std::setw(10) << statusLabel(status)
                   << "age=" << reading.ageSeconds << "s\n";
 
-        if (status == TelemetryStatus::OutOfRange) {
-            ++alertCount;
+        if (status == TelemetryStatus::Warning) {
+            ++warningCount;
+        } else if (status == TelemetryStatus::Critical) {
+            ++criticalCount;
         } else if (status == TelemetryStatus::Stale) {
             ++staleCount;
         } else if (status == TelemetryStatus::MissingData) {
@@ -94,9 +108,13 @@ int main() {
         }
     }
 
-    std::cout << "\nOut-of-range alerts: " << alertCount << '\n'
+    std::cout << "\nWarnings: " << warningCount << '\n'
+              << "Critical alerts: " << criticalCount << '\n'
               << "Stale readings: " << staleCount << '\n'
               << "Missing readings: " << missingDataCount << '\n';
 
-    return (alertCount == 0 && staleCount == 0 && missingDataCount == 0) ? 0 : 1;
+    return (warningCount == 0 && criticalCount == 0 &&
+            staleCount == 0 && missingDataCount == 0)
+               ? 0
+               : 1;
 }
