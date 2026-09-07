@@ -22,10 +22,27 @@ enum class TelemetryStatus {
     Warning,
     Critical,
     Stale,
-    MissingData
+    MissingData,
+    InvalidConfiguration
 };
 
+bool hasValidConfiguration(const TelemetryReading& reading) {
+    return std::isfinite(reading.warningMinimum) &&
+           std::isfinite(reading.warningMaximum) &&
+           std::isfinite(reading.criticalMinimum) &&
+           std::isfinite(reading.criticalMaximum) &&
+           reading.criticalMinimum <= reading.warningMinimum &&
+           reading.warningMinimum <= reading.warningMaximum &&
+           reading.warningMaximum <= reading.criticalMaximum &&
+           std::isfinite(reading.maxAgeSeconds) &&
+           reading.maxAgeSeconds >= 0.0;
+}
+
 TelemetryStatus evaluateReading(const TelemetryReading& reading) {
+    if (!hasValidConfiguration(reading)) {
+        return TelemetryStatus::InvalidConfiguration;
+    }
+
     if (!std::isfinite(reading.value)) {
         return TelemetryStatus::MissingData;
     }
@@ -59,6 +76,8 @@ std::string statusLabel(TelemetryStatus status) {
             return "STALE";
         case TelemetryStatus::MissingData:
             return "NO DATA";
+        case TelemetryStatus::InvalidConfiguration:
+            return "CONFIG ERROR";
     }
 
     return "UNKNOWN";
@@ -80,6 +99,7 @@ int main() {
     int criticalCount = 0;
     int staleCount = 0;
     int missingDataCount = 0;
+    int configurationErrorCount = 0;
 
     for (const auto& reading : readings) {
         const TelemetryStatus status = evaluateReading(reading);
@@ -94,7 +114,7 @@ int main() {
         }
 
         std::cout << std::setw(8) << reading.unit
-                  << std::setw(10) << statusLabel(status)
+                  << std::setw(14) << statusLabel(status)
                   << "age=" << reading.ageSeconds << "s\n";
 
         if (status == TelemetryStatus::Warning) {
@@ -105,16 +125,20 @@ int main() {
             ++staleCount;
         } else if (status == TelemetryStatus::MissingData) {
             ++missingDataCount;
+        } else if (status == TelemetryStatus::InvalidConfiguration) {
+            ++configurationErrorCount;
         }
     }
 
     std::cout << "\nWarnings: " << warningCount << '\n'
               << "Critical alerts: " << criticalCount << '\n'
               << "Stale readings: " << staleCount << '\n'
-              << "Missing readings: " << missingDataCount << '\n';
+              << "Missing readings: " << missingDataCount << '\n'
+              << "Configuration errors: " << configurationErrorCount << '\n';
 
     return (warningCount == 0 && criticalCount == 0 &&
-            staleCount == 0 && missingDataCount == 0)
+            staleCount == 0 && missingDataCount == 0 &&
+            configurationErrorCount == 0)
                ? 0
                : 1;
 }
