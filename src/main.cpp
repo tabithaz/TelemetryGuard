@@ -8,8 +8,10 @@
 struct TelemetryReading {
     std::string channel;
     double value;
-    double minimum;
-    double maximum;
+    double warningMinimum;
+    double warningMaximum;
+    double criticalMinimum;
+    double criticalMaximum;
     std::string unit;
     double ageSeconds;
     double maxAgeSeconds;
@@ -32,15 +34,13 @@ TelemetryStatus evaluateReading(const TelemetryReading& reading) {
         return TelemetryStatus::Stale;
     }
 
-    if (reading.value < reading.minimum || reading.value > reading.maximum) {
-        const double operatingRange = reading.maximum - reading.minimum;
-        const double criticalMargin = operatingRange * 0.10;
+    if (reading.value < reading.criticalMinimum ||
+        reading.value > reading.criticalMaximum) {
+        return TelemetryStatus::Critical;
+    }
 
-        if (reading.value < reading.minimum - criticalMargin ||
-            reading.value > reading.maximum + criticalMargin) {
-            return TelemetryStatus::Critical;
-        }
-
+    if (reading.value < reading.warningMinimum ||
+        reading.value > reading.warningMaximum) {
         return TelemetryStatus::Warning;
     }
 
@@ -66,12 +66,12 @@ std::string statusLabel(TelemetryStatus status) {
 
 int main() {
     const std::vector<TelemetryReading> readings = {
-        {"Altitude", 18250.0, 0.0, 25000.0, "m", 0.4, 2.0},
-        {"Velocity", 1240.0, 0.0, 1800.0, "m/s", 0.7, 2.0},
-        {"Temperature", 91.5, -40.0, 85.0, "C", 0.3, 5.0},
-        {"Pressure", 238.0, 150.0, 300.0, "kPa", 6.2, 5.0},
-        {"Battery Voltage", 33.5, 24.0, 30.0, "V", 1.1, 5.0},
-        {"Fuel Level", std::numeric_limits<double>::quiet_NaN(), 0.0, 100.0, "%", 0.8, 5.0}
+        {"Altitude", 18250.0, 0.0, 25000.0, -500.0, 27000.0, "m", 0.4, 2.0},
+        {"Velocity", 1240.0, 0.0, 1800.0, -100.0, 2000.0, "m/s", 0.7, 2.0},
+        {"Temperature", 91.5, -40.0, 85.0, -55.0, 100.0, "C", 0.3, 5.0},
+        {"Pressure", 238.0, 150.0, 300.0, 125.0, 325.0, "kPa", 6.2, 5.0},
+        {"Battery Voltage", 33.5, 24.0, 30.0, 22.0, 32.0, "V", 1.1, 5.0},
+        {"Fuel Level", std::numeric_limits<double>::quiet_NaN(), 0.0, 100.0, -1.0, 101.0, "%", 0.8, 5.0}
     };
 
     std::cout << "TelemetryGuard - Vehicle Health Check\n\n";
