@@ -14,6 +14,7 @@ struct TelemetryReading {
     double criticalMaximum;
     std::string unit;
     double ageSeconds;
+    double warningAgeSeconds;
     double maxAgeSeconds;
 };
 
@@ -21,6 +22,7 @@ enum class TelemetryStatus {
     Nominal,
     Warning,
     Critical,
+    Aging,
     Stale,
     MissingData,
     InvalidTimestamp,
@@ -35,8 +37,10 @@ bool hasValidConfiguration(const TelemetryReading& reading) {
            reading.criticalMinimum <= reading.warningMinimum &&
            reading.warningMinimum <= reading.warningMaximum &&
            reading.warningMaximum <= reading.criticalMaximum &&
+           std::isfinite(reading.warningAgeSeconds) &&
+           reading.warningAgeSeconds >= 0.0 &&
            std::isfinite(reading.maxAgeSeconds) &&
-           reading.maxAgeSeconds >= 0.0;
+           reading.warningAgeSeconds <= reading.maxAgeSeconds;
 }
 
 TelemetryStatus evaluateReading(const TelemetryReading& reading) {
@@ -66,6 +70,10 @@ TelemetryStatus evaluateReading(const TelemetryReading& reading) {
         return TelemetryStatus::Warning;
     }
 
+    if (reading.ageSeconds > reading.warningAgeSeconds) {
+        return TelemetryStatus::Aging;
+    }
+
     return TelemetryStatus::Nominal;
 }
 
@@ -77,6 +85,8 @@ std::string statusLabel(TelemetryStatus status) {
             return "WARNING";
         case TelemetryStatus::Critical:
             return "CRITICAL";
+        case TelemetryStatus::Aging:
+            return "AGING";
         case TelemetryStatus::Stale:
             return "STALE";
         case TelemetryStatus::MissingData:
@@ -92,19 +102,21 @@ std::string statusLabel(TelemetryStatus status) {
 
 int main() {
     const std::vector<TelemetryReading> readings = {
-        {"Altitude", 18250.0, 0.0, 25000.0, -500.0, 27000.0, "m", 0.4, 2.0},
-        {"Velocity", 1240.0, 0.0, 1800.0, -100.0, 2000.0, "m/s", 0.7, 2.0},
-        {"Temperature", 91.5, -40.0, 85.0, -55.0, 100.0, "C", 0.3, 5.0},
-        {"Pressure", 238.0, 150.0, 300.0, 125.0, 325.0, "kPa", 6.2, 5.0},
-        {"Battery Voltage", 33.5, 24.0, 30.0, 22.0, 32.0, "V", 1.1, 5.0},
-        {"Fuel Level", std::numeric_limits<double>::quiet_NaN(), 0.0, 100.0, -1.0, 101.0, "%", 0.8, 5.0},
-        {"Guidance Quality", 98.0, 90.0, 100.0, 80.0, 105.0, "%", -0.2, 2.0}
+        {"Altitude", 18250.0, 0.0, 25000.0, -500.0, 27000.0, "m", 0.4, 1.5, 2.0},
+        {"Velocity", 1240.0, 0.0, 1800.0, -100.0, 2000.0, "m/s", 0.7, 1.5, 2.0},
+        {"Temperature", 91.5, -40.0, 85.0, -55.0, 100.0, "C", 0.3, 4.0, 5.0},
+        {"Pressure", 238.0, 150.0, 300.0, 125.0, 325.0, "kPa", 6.2, 4.0, 5.0},
+        {"Battery Voltage", 33.5, 24.0, 30.0, 22.0, 32.0, "V", 1.1, 4.0, 5.0},
+        {"Fuel Level", std::numeric_limits<double>::quiet_NaN(), 0.0, 100.0, -1.0, 101.0, "%", 0.8, 4.0, 5.0},
+        {"Guidance Quality", 98.0, 90.0, 100.0, 80.0, 105.0, "%", -0.2, 1.5, 2.0},
+        {"Navigation Update", 97.0, 90.0, 100.0, 80.0, 105.0, "%", 1.7, 1.5, 2.0}
     };
 
     std::cout << "TelemetryGuard - Vehicle Health Check\n\n";
 
     int warningCount = 0;
     int criticalCount = 0;
+    int agingCount = 0;
     int staleCount = 0;
     int missingDataCount = 0;
     int invalidTimestampCount = 0;
@@ -130,6 +142,8 @@ int main() {
             ++warningCount;
         } else if (status == TelemetryStatus::Critical) {
             ++criticalCount;
+        } else if (status == TelemetryStatus::Aging) {
+            ++agingCount;
         } else if (status == TelemetryStatus::Stale) {
             ++staleCount;
         } else if (status == TelemetryStatus::MissingData) {
@@ -143,13 +157,14 @@ int main() {
 
     std::cout << "\nWarnings: " << warningCount << '\n'
               << "Critical alerts: " << criticalCount << '\n'
+              << "Aging readings: " << agingCount << '\n'
               << "Stale readings: " << staleCount << '\n'
               << "Missing readings: " << missingDataCount << '\n'
               << "Invalid timestamps: " << invalidTimestampCount << '\n'
               << "Configuration errors: " << configurationErrorCount << '\n';
 
     return (warningCount == 0 && criticalCount == 0 &&
-            staleCount == 0 && missingDataCount == 0 &&
+            agingCount == 0 && staleCount == 0 && missingDataCount == 0 &&
             invalidTimestampCount == 0 &&
             configurationErrorCount == 0)
                ? 0
