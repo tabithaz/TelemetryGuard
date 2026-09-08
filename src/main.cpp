@@ -23,6 +23,7 @@ enum class TelemetryStatus {
     Critical,
     Stale,
     MissingData,
+    InvalidTimestamp,
     InvalidConfiguration
 };
 
@@ -45,6 +46,10 @@ TelemetryStatus evaluateReading(const TelemetryReading& reading) {
 
     if (!std::isfinite(reading.value)) {
         return TelemetryStatus::MissingData;
+    }
+
+    if (!std::isfinite(reading.ageSeconds) || reading.ageSeconds < 0.0) {
+        return TelemetryStatus::InvalidTimestamp;
     }
 
     if (reading.ageSeconds > reading.maxAgeSeconds) {
@@ -76,6 +81,8 @@ std::string statusLabel(TelemetryStatus status) {
             return "STALE";
         case TelemetryStatus::MissingData:
             return "NO DATA";
+        case TelemetryStatus::InvalidTimestamp:
+            return "BAD TIMESTAMP";
         case TelemetryStatus::InvalidConfiguration:
             return "CONFIG ERROR";
     }
@@ -90,7 +97,8 @@ int main() {
         {"Temperature", 91.5, -40.0, 85.0, -55.0, 100.0, "C", 0.3, 5.0},
         {"Pressure", 238.0, 150.0, 300.0, 125.0, 325.0, "kPa", 6.2, 5.0},
         {"Battery Voltage", 33.5, 24.0, 30.0, 22.0, 32.0, "V", 1.1, 5.0},
-        {"Fuel Level", std::numeric_limits<double>::quiet_NaN(), 0.0, 100.0, -1.0, 101.0, "%", 0.8, 5.0}
+        {"Fuel Level", std::numeric_limits<double>::quiet_NaN(), 0.0, 100.0, -1.0, 101.0, "%", 0.8, 5.0},
+        {"Guidance Quality", 98.0, 90.0, 100.0, 80.0, 105.0, "%", -0.2, 2.0}
     };
 
     std::cout << "TelemetryGuard - Vehicle Health Check\n\n";
@@ -99,6 +107,7 @@ int main() {
     int criticalCount = 0;
     int staleCount = 0;
     int missingDataCount = 0;
+    int invalidTimestampCount = 0;
     int configurationErrorCount = 0;
 
     for (const auto& reading : readings) {
@@ -125,6 +134,8 @@ int main() {
             ++staleCount;
         } else if (status == TelemetryStatus::MissingData) {
             ++missingDataCount;
+        } else if (status == TelemetryStatus::InvalidTimestamp) {
+            ++invalidTimestampCount;
         } else if (status == TelemetryStatus::InvalidConfiguration) {
             ++configurationErrorCount;
         }
@@ -134,10 +145,12 @@ int main() {
               << "Critical alerts: " << criticalCount << '\n'
               << "Stale readings: " << staleCount << '\n'
               << "Missing readings: " << missingDataCount << '\n'
+              << "Invalid timestamps: " << invalidTimestampCount << '\n'
               << "Configuration errors: " << configurationErrorCount << '\n';
 
     return (warningCount == 0 && criticalCount == 0 &&
             staleCount == 0 && missingDataCount == 0 &&
+            invalidTimestampCount == 0 &&
             configurationErrorCount == 0)
                ? 0
                : 1;
