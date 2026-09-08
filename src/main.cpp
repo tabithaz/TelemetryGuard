@@ -100,6 +100,27 @@ std::string statusLabel(TelemetryStatus status) {
     return "UNKNOWN";
 }
 
+std::string vehicleDisposition(
+    int warningCount,
+    int criticalCount,
+    int agingCount,
+    int staleCount,
+    int missingDataCount,
+    int invalidTimestampCount,
+    int configurationErrorCount) {
+    const int blockingIssues = criticalCount + staleCount + missingDataCount +
+                               invalidTimestampCount + configurationErrorCount;
+    if (blockingIssues > 0) {
+        return "HOLD";
+    }
+
+    if (warningCount > 0 || agingCount > 0) {
+        return "MONITOR";
+    }
+
+    return "GO";
+}
+
 int main() {
     const std::vector<TelemetryReading> readings = {
         {"Altitude", 18250.0, 0.0, 25000.0, -500.0, 27000.0, "m", 0.4, 1.5, 2.0},
@@ -161,7 +182,17 @@ int main() {
               << "Stale readings: " << staleCount << '\n'
               << "Missing readings: " << missingDataCount << '\n'
               << "Invalid timestamps: " << invalidTimestampCount << '\n'
-              << "Configuration errors: " << configurationErrorCount << '\n';
+              << "Configuration errors: " << configurationErrorCount << '\n'
+              << "Vehicle disposition: "
+              << vehicleDisposition(
+                     warningCount,
+                     criticalCount,
+                     agingCount,
+                     staleCount,
+                     missingDataCount,
+                     invalidTimestampCount,
+                     configurationErrorCount)
+              << '\n';
 
     return (warningCount == 0 && criticalCount == 0 &&
             agingCount == 0 && staleCount == 0 && missingDataCount == 0 &&
