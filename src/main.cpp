@@ -83,6 +83,28 @@ std::string statusLabel(TelemetryStatus status) {
     return "UNKNOWN";
 }
 
+int statusPriority(TelemetryStatus status) {
+    switch (status) {
+        case TelemetryStatus::InvalidConfiguration: return 7;
+        case TelemetryStatus::MissingData: return 6;
+        case TelemetryStatus::Critical: return 5;
+        case TelemetryStatus::Stale: return 4;
+        case TelemetryStatus::InvalidTimestamp: return 3;
+        case TelemetryStatus::Warning: return 2;
+        case TelemetryStatus::Aging: return 1;
+        case TelemetryStatus::Nominal: return 0;
+    }
+    return 0;
+}
+
+bool requiresHold(TelemetryStatus status) {
+    return status == TelemetryStatus::Critical ||
+           status == TelemetryStatus::Stale ||
+           status == TelemetryStatus::MissingData ||
+           status == TelemetryStatus::InvalidTimestamp ||
+           status == TelemetryStatus::InvalidConfiguration;
+}
+
 std::string vehicleDisposition(int warningCount, int criticalCount, int agingCount,
                                int staleCount, int missingDataCount,
                                int invalidTimestampCount, int configurationErrorCount) {
@@ -137,6 +159,10 @@ int main() {
     int missingDataCount = 0;
     int invalidTimestampCount = 0;
     int configurationErrorCount = 0;
+    int blockingIssueCount = 0;
+    int highestPriority = -1;
+    std::string priorityChannel = "None";
+    TelemetryStatus priorityStatus = TelemetryStatus::Nominal;
 
     for (const auto& reading : readings) {
         const TelemetryStatus status = evaluateReading(reading);
@@ -154,6 +180,14 @@ int main() {
         else if (status == TelemetryStatus::MissingData) ++missingDataCount;
         else if (status == TelemetryStatus::InvalidTimestamp) ++invalidTimestampCount;
         else if (status == TelemetryStatus::InvalidConfiguration) ++configurationErrorCount;
+
+        if (requiresHold(status)) ++blockingIssueCount;
+        const int priority = statusPriority(status);
+        if (priority > highestPriority) {
+            highestPriority = priority;
+            priorityChannel = reading.channel;
+            priorityStatus = status;
+        }
     }
 
     const int totalReadings = static_cast<int>(readings.size());
@@ -171,6 +205,9 @@ int main() {
               << "Missing readings: " << missingDataCount << '\n'
               << "Invalid timestamps: " << invalidTimestampCount << '\n'
               << "Configuration errors: " << configurationErrorCount << '\n'
+              << "Blocking issues: " << blockingIssueCount << '\n'
+              << "Priority channel: " << priorityChannel << " ("
+              << statusLabel(priorityStatus) << ")\n"
               << "Telemetry availability: " << std::fixed << std::setprecision(1)
               << availability << "%\n"
               << "Vehicle health score: " << healthScore << "/100\n"
