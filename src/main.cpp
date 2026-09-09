@@ -104,6 +104,18 @@ int vehicleHealthScore(int totalReadings, int warningCount, int criticalCount,
     return std::max(0, 100 - penalty);
 }
 
+double telemetryAvailabilityPercent(int totalReadings, int staleCount,
+                                    int missingDataCount, int invalidTimestampCount,
+                                    int configurationErrorCount) {
+    if (totalReadings <= 0) return 100.0;
+
+    const int unavailableReadings = staleCount + missingDataCount +
+                                    invalidTimestampCount + configurationErrorCount;
+    const int availableReadings = std::max(0, totalReadings - unavailableReadings);
+    return 100.0 * static_cast<double>(availableReadings) /
+           static_cast<double>(totalReadings);
+}
+
 int main() {
     const std::vector<TelemetryReading> readings = {
         {"Altitude", 18250.0, 0.0, 25000.0, -500.0, 27000.0, "m", 0.4, 1.5, 2.0},
@@ -144,9 +156,13 @@ int main() {
         else if (status == TelemetryStatus::InvalidConfiguration) ++configurationErrorCount;
     }
 
+    const int totalReadings = static_cast<int>(readings.size());
     const int healthScore = vehicleHealthScore(
-        static_cast<int>(readings.size()), warningCount, criticalCount, agingCount,
-        staleCount, missingDataCount, invalidTimestampCount, configurationErrorCount);
+        totalReadings, warningCount, criticalCount, agingCount, staleCount,
+        missingDataCount, invalidTimestampCount, configurationErrorCount);
+    const double availability = telemetryAvailabilityPercent(
+        totalReadings, staleCount, missingDataCount, invalidTimestampCount,
+        configurationErrorCount);
 
     std::cout << "\nWarnings: " << warningCount << '\n'
               << "Critical alerts: " << criticalCount << '\n'
@@ -155,6 +171,8 @@ int main() {
               << "Missing readings: " << missingDataCount << '\n'
               << "Invalid timestamps: " << invalidTimestampCount << '\n'
               << "Configuration errors: " << configurationErrorCount << '\n'
+              << "Telemetry availability: " << std::fixed << std::setprecision(1)
+              << availability << "%\n"
               << "Vehicle health score: " << healthScore << "/100\n"
               << "Vehicle disposition: "
               << vehicleDisposition(warningCount, criticalCount, agingCount, staleCount,
