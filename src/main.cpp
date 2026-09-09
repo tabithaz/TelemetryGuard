@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cmath>
 #include <iomanip>
 #include <iostream>
@@ -47,78 +48,60 @@ TelemetryStatus evaluateReading(const TelemetryReading& reading) {
     if (!hasValidConfiguration(reading)) {
         return TelemetryStatus::InvalidConfiguration;
     }
-
     if (!std::isfinite(reading.value)) {
         return TelemetryStatus::MissingData;
     }
-
     if (!std::isfinite(reading.ageSeconds) || reading.ageSeconds < 0.0) {
         return TelemetryStatus::InvalidTimestamp;
     }
-
     if (reading.ageSeconds > reading.maxAgeSeconds) {
         return TelemetryStatus::Stale;
     }
-
-    if (reading.value < reading.criticalMinimum ||
-        reading.value > reading.criticalMaximum) {
+    if (reading.value < reading.criticalMinimum || reading.value > reading.criticalMaximum) {
         return TelemetryStatus::Critical;
     }
-
-    if (reading.value < reading.warningMinimum ||
-        reading.value > reading.warningMaximum) {
+    if (reading.value < reading.warningMinimum || reading.value > reading.warningMaximum) {
         return TelemetryStatus::Warning;
     }
-
     if (reading.ageSeconds > reading.warningAgeSeconds) {
         return TelemetryStatus::Aging;
     }
-
     return TelemetryStatus::Nominal;
 }
 
 std::string statusLabel(TelemetryStatus status) {
     switch (status) {
-        case TelemetryStatus::Nominal:
-            return "NOMINAL";
-        case TelemetryStatus::Warning:
-            return "WARNING";
-        case TelemetryStatus::Critical:
-            return "CRITICAL";
-        case TelemetryStatus::Aging:
-            return "AGING";
-        case TelemetryStatus::Stale:
-            return "STALE";
-        case TelemetryStatus::MissingData:
-            return "NO DATA";
-        case TelemetryStatus::InvalidTimestamp:
-            return "BAD TIMESTAMP";
-        case TelemetryStatus::InvalidConfiguration:
-            return "CONFIG ERROR";
+        case TelemetryStatus::Nominal: return "NOMINAL";
+        case TelemetryStatus::Warning: return "WARNING";
+        case TelemetryStatus::Critical: return "CRITICAL";
+        case TelemetryStatus::Aging: return "AGING";
+        case TelemetryStatus::Stale: return "STALE";
+        case TelemetryStatus::MissingData: return "NO DATA";
+        case TelemetryStatus::InvalidTimestamp: return "BAD TIMESTAMP";
+        case TelemetryStatus::InvalidConfiguration: return "CONFIG ERROR";
     }
-
     return "UNKNOWN";
 }
 
-std::string vehicleDisposition(
-    int warningCount,
-    int criticalCount,
-    int agingCount,
-    int staleCount,
-    int missingDataCount,
-    int invalidTimestampCount,
-    int configurationErrorCount) {
+std::string vehicleDisposition(int warningCount, int criticalCount, int agingCount,
+                               int staleCount, int missingDataCount,
+                               int invalidTimestampCount, int configurationErrorCount) {
     const int blockingIssues = criticalCount + staleCount + missingDataCount +
                                invalidTimestampCount + configurationErrorCount;
-    if (blockingIssues > 0) {
-        return "HOLD";
-    }
-
-    if (warningCount > 0 || agingCount > 0) {
-        return "MONITOR";
-    }
-
+    if (blockingIssues > 0) return "HOLD";
+    if (warningCount > 0 || agingCount > 0) return "MONITOR";
     return "GO";
+}
+
+int vehicleHealthScore(int totalReadings, int warningCount, int criticalCount,
+                       int agingCount, int staleCount, int missingDataCount,
+                       int invalidTimestampCount, int configurationErrorCount) {
+    if (totalReadings <= 0) return 100;
+
+    const int penalty = warningCount * 8 + agingCount * 5 + criticalCount * 25 +
+                        staleCount * 20 + missingDataCount * 25 +
+                        invalidTimestampCount * 20 + configurationErrorCount * 25;
+    return std::max(0, 100 - penalty);
 }
 
 int main() {
@@ -145,36 +128,25 @@ int main() {
 
     for (const auto& reading : readings) {
         const TelemetryStatus status = evaluateReading(reading);
+        std::cout << std::left << std::setw(18) << reading.channel << std::setw(10);
+        if (status == TelemetryStatus::MissingData) std::cout << "N/A";
+        else std::cout << reading.value;
 
-        std::cout << std::left << std::setw(18) << reading.channel
-                  << std::setw(10);
-
-        if (status == TelemetryStatus::MissingData) {
-            std::cout << "N/A";
-        } else {
-            std::cout << reading.value;
-        }
-
-        std::cout << std::setw(8) << reading.unit
-                  << std::setw(14) << statusLabel(status)
+        std::cout << std::setw(8) << reading.unit << std::setw(14) << statusLabel(status)
                   << "age=" << reading.ageSeconds << "s\n";
 
-        if (status == TelemetryStatus::Warning) {
-            ++warningCount;
-        } else if (status == TelemetryStatus::Critical) {
-            ++criticalCount;
-        } else if (status == TelemetryStatus::Aging) {
-            ++agingCount;
-        } else if (status == TelemetryStatus::Stale) {
-            ++staleCount;
-        } else if (status == TelemetryStatus::MissingData) {
-            ++missingDataCount;
-        } else if (status == TelemetryStatus::InvalidTimestamp) {
-            ++invalidTimestampCount;
-        } else if (status == TelemetryStatus::InvalidConfiguration) {
-            ++configurationErrorCount;
-        }
+        if (status == TelemetryStatus::Warning) ++warningCount;
+        else if (status == TelemetryStatus::Critical) ++criticalCount;
+        else if (status == TelemetryStatus::Aging) ++agingCount;
+        else if (status == TelemetryStatus::Stale) ++staleCount;
+        else if (status == TelemetryStatus::MissingData) ++missingDataCount;
+        else if (status == TelemetryStatus::InvalidTimestamp) ++invalidTimestampCount;
+        else if (status == TelemetryStatus::InvalidConfiguration) ++configurationErrorCount;
     }
+
+    const int healthScore = vehicleHealthScore(
+        static_cast<int>(readings.size()), warningCount, criticalCount, agingCount,
+        staleCount, missingDataCount, invalidTimestampCount, configurationErrorCount);
 
     std::cout << "\nWarnings: " << warningCount << '\n'
               << "Critical alerts: " << criticalCount << '\n'
@@ -183,21 +155,15 @@ int main() {
               << "Missing readings: " << missingDataCount << '\n'
               << "Invalid timestamps: " << invalidTimestampCount << '\n'
               << "Configuration errors: " << configurationErrorCount << '\n'
+              << "Vehicle health score: " << healthScore << "/100\n"
               << "Vehicle disposition: "
-              << vehicleDisposition(
-                     warningCount,
-                     criticalCount,
-                     agingCount,
-                     staleCount,
-                     missingDataCount,
-                     invalidTimestampCount,
-                     configurationErrorCount)
+              << vehicleDisposition(warningCount, criticalCount, agingCount, staleCount,
+                                    missingDataCount, invalidTimestampCount,
+                                    configurationErrorCount)
               << '\n';
 
-    return (warningCount == 0 && criticalCount == 0 &&
-            agingCount == 0 && staleCount == 0 && missingDataCount == 0 &&
-            invalidTimestampCount == 0 &&
-            configurationErrorCount == 0)
+    return (warningCount == 0 && criticalCount == 0 && agingCount == 0 && staleCount == 0 &&
+            missingDataCount == 0 && invalidTimestampCount == 0 && configurationErrorCount == 0)
                ? 0
                : 1;
 }
