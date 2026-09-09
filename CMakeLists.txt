@@ -10,3 +10,11 @@ add_executable(telemetry_guard src/main.cpp)
 target_compile_options(telemetry_guard PRIVATE
     $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall -Wextra -Wpedantic>
 )
+
+enable_testing()
+add_test(
+    NAME synthetic_health_check
+    COMMAND ${CMAKE_COMMAND}
+        -DTELEMETRY_GUARD=$<TARGET_FILE:telemetry_guard>
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/synthetic_health_check.cmake
+)
