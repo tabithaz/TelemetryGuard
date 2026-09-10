@@ -1,26 +1,32 @@
 #include "../src/limit_margin.hpp"
 
-#include <cassert>
 #include <cmath>
 #include <stdexcept>
 
+namespace {
+bool nearlyEqual(double left, double right) {
+    return std::abs(left - right) < 1e-9;
+}
+}
+
 int main() {
     const LimitMargin centered = calculateLimitMargin(50.0, 0.0, 100.0, -10.0, 110.0);
-    assert(std::abs(centered.nearestWarningMargin - 50.0) < 1e-9);
-    assert(std::abs(centered.nearestCriticalMargin - 60.0) < 1e-9);
-    assert(std::abs(centered.warningHeadroomPercent - 100.0) < 1e-9);
+    if (!nearlyEqual(centered.nearestWarningMargin, 50.0) ||
+        !nearlyEqual(centered.nearestCriticalMargin, 60.0) ||
+        !nearlyEqual(centered.warningHeadroomPercent, 100.0)) {
+        return 1;
+    }
 
     const LimitMargin nearWarning = calculateLimitMargin(90.0, 0.0, 100.0, -10.0, 110.0);
-    assert(std::abs(nearWarning.nearestWarningMargin - 10.0) < 1e-9);
-    assert(std::abs(nearWarning.warningHeadroomPercent - 20.0) < 1e-9);
+    if (!nearlyEqual(nearWarning.nearestWarningMargin, 10.0) ||
+        !nearlyEqual(nearWarning.warningHeadroomPercent, 20.0)) {
+        return 2;
+    }
 
-    bool threw = false;
     try {
         calculateLimitMargin(5.0, 10.0, 0.0, -1.0, 20.0);
+        return 3;
     } catch (const std::invalid_argument&) {
-        threw = true;
+        return 0;
     }
-    assert(threw);
-
-    return 0;
 }
