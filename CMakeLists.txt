@@ -6,8 +6,12 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_executable(telemetry_guard src/main.cpp)
+add_executable(limit_margin_test tests/limit_margin_test.cpp)
 
 target_compile_options(telemetry_guard PRIVATE
+    $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall -Wextra -Wpedantic>
+)
+target_compile_options(limit_margin_test PRIVATE
     $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall -Wextra -Wpedantic>
 )
 
@@ -18,3 +22,4 @@ add_test(
         -DTELEMETRY_GUARD=$<TARGET_FILE:telemetry_guard>
         -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/synthetic_health_check.cmake
 )
+add_test(NAME limit_margin_analysis COMMAND limit_margin_test)
