@@ -144,6 +144,19 @@ double telemetryAvailabilityPercent(int totalReadings, int staleCount,
            static_cast<double>(totalReadings);
 }
 
+double telemetryDegradationPercent(int totalReadings, int nominalCount) {
+    if (totalReadings <= 0) return 0.0;
+    const int degradedReadings = std::max(0, totalReadings - nominalCount);
+    return 100.0 * static_cast<double>(degradedReadings) /
+           static_cast<double>(totalReadings);
+}
+
+std::string healthBand(int healthScore) {
+    if (healthScore >= 90) return "GREEN";
+    if (healthScore >= 70) return "AMBER";
+    return "RED";
+}
+
 int main() {
     const std::vector<TelemetryReading> readings = {
         {"Altitude", 18250.0, 0.0, 25000.0, -500.0, 27000.0, "m", 0.4, 1.5, 2.0},
@@ -158,6 +171,7 @@ int main() {
 
     std::cout << "TelemetryGuard - Vehicle Health Check\n\n";
 
+    int nominalCount = 0;
     int warningCount = 0;
     int criticalCount = 0;
     int agingCount = 0;
@@ -179,7 +193,8 @@ int main() {
         std::cout << std::setw(8) << reading.unit << std::setw(14) << statusLabel(status)
                   << "age=" << reading.ageSeconds << "s\n";
 
-        if (status == TelemetryStatus::Warning) ++warningCount;
+        if (status == TelemetryStatus::Nominal) ++nominalCount;
+        else if (status == TelemetryStatus::Warning) ++warningCount;
         else if (status == TelemetryStatus::Critical) ++criticalCount;
         else if (status == TelemetryStatus::Aging) ++agingCount;
         else if (status == TelemetryStatus::Stale) ++staleCount;
@@ -203,11 +218,13 @@ int main() {
     const double availability = telemetryAvailabilityPercent(
         totalReadings, staleCount, missingDataCount, invalidTimestampCount,
         configurationErrorCount);
+    const double degradation = telemetryDegradationPercent(totalReadings, nominalCount);
     const std::string disposition = vehicleDisposition(
         warningCount, criticalCount, agingCount, staleCount, missingDataCount,
         invalidTimestampCount, configurationErrorCount);
 
-    std::cout << "\nWarnings: " << warningCount << '\n'
+    std::cout << "\nNominal readings: " << nominalCount << '\n'
+              << "Warnings: " << warningCount << '\n'
               << "Critical alerts: " << criticalCount << '\n'
               << "Aging readings: " << agingCount << '\n'
               << "Stale readings: " << staleCount << '\n'
@@ -219,7 +236,9 @@ int main() {
               << statusLabel(priorityStatus) << ")\n"
               << "Telemetry availability: " << std::fixed << std::setprecision(1)
               << availability << "%\n"
+              << "Telemetry degradation: " << degradation << "%\n"
               << "Vehicle health score: " << healthScore << "/100\n"
+              << "Health band: " << healthBand(healthScore) << '\n'
               << "Vehicle disposition: " << disposition << '\n';
 
     return dispositionExitCode(disposition);
