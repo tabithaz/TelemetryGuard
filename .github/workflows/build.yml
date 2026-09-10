@@ -22,6 +22,7 @@ jobs:
     env:
       CC: ${{ matrix.compiler.cc }}
       CXX: ${{ matrix.compiler.cxx }}
+      CXXFLAGS: -Wall -Wextra -Wpedantic -Werror
     steps:
       - uses: actions/checkout@v4
       - name: Configure
@@ -30,3 +31,23 @@ jobs:
         run: cmake --build build --config Release --parallel
       - name: Test synthetic health check
         run: ctest --test-dir build --output-on-failure
+
+  sanitizers:
+    runs-on: ubuntu-latest
+    name: Address and undefined behavior sanitizers
+    env:
+      CC: clang
+      CXX: clang++
+      CXXFLAGS: -Wall -Wextra -Wpedantic -Werror -fsanitize=address,undefined -fno-omit-frame-pointer
+      LDFLAGS: -fsanitize=address,undefined
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure debug instrumentation
+        run: cmake -S . -B build-sanitized -DCMAKE_BUILD_TYPE=Debug
+      - name: Build instrumented binary
+        run: cmake --build build-sanitized --parallel
+      - name: Run health check under sanitizers
+        env:
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: ctest --test-dir build-sanitized --output-on-failure
