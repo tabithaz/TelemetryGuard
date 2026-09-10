@@ -115,6 +115,12 @@ std::string vehicleDisposition(int warningCount, int criticalCount, int agingCou
     return "GO";
 }
 
+int dispositionExitCode(const std::string& disposition) {
+    if (disposition == "HOLD") return 2;
+    if (disposition == "MONITOR") return 1;
+    return 0;
+}
+
 int vehicleHealthScore(int totalReadings, int warningCount, int criticalCount,
                        int agingCount, int staleCount, int missingDataCount,
                        int invalidTimestampCount, int configurationErrorCount) {
@@ -197,6 +203,9 @@ int main() {
     const double availability = telemetryAvailabilityPercent(
         totalReadings, staleCount, missingDataCount, invalidTimestampCount,
         configurationErrorCount);
+    const std::string disposition = vehicleDisposition(
+        warningCount, criticalCount, agingCount, staleCount, missingDataCount,
+        invalidTimestampCount, configurationErrorCount);
 
     std::cout << "\nWarnings: " << warningCount << '\n'
               << "Critical alerts: " << criticalCount << '\n'
@@ -211,14 +220,7 @@ int main() {
               << "Telemetry availability: " << std::fixed << std::setprecision(1)
               << availability << "%\n"
               << "Vehicle health score: " << healthScore << "/100\n"
-              << "Vehicle disposition: "
-              << vehicleDisposition(warningCount, criticalCount, agingCount, staleCount,
-                                    missingDataCount, invalidTimestampCount,
-                                    configurationErrorCount)
-              << '\n';
+              << "Vehicle disposition: " << disposition << '\n';
 
-    return (warningCount == 0 && criticalCount == 0 && agingCount == 0 && staleCount == 0 &&
-            missingDataCount == 0 && invalidTimestampCount == 0 && configurationErrorCount == 0)
-               ? 0
-               : 1;
+    return dispositionExitCode(disposition);
 }

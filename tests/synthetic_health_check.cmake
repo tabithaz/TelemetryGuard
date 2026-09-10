@@ -5,8 +5,8 @@ execute_process(
     ERROR_VARIABLE error_output
 )
 
-if(NOT result EQUAL 1)
-    message(FATAL_ERROR "Synthetic health check returned ${result}, expected 1")
+if(NOT result EQUAL 2)
+    message(FATAL_ERROR "Synthetic health check returned ${result}, expected HOLD exit code 2")
 endif()
 
 set(combined_output "${output}${error_output}")
