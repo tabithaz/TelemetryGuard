@@ -12,6 +12,7 @@ endif()
 set(combined_output "${output}${error_output}")
 
 foreach(expected_line
+        "Nominal readings: 2"
         "Warnings: 1"
         "Critical alerts: 1"
         "Aging readings: 1"
@@ -22,7 +23,9 @@ foreach(expected_line
         "Blocking issues: 4"
         "Priority channel: Fuel Level (NO DATA)"
         "Telemetry availability: 62.5%"
+        "Telemetry degradation: 75.0%"
         "Vehicle health score: 0/100"
+        "Health band: RED"
         "Vehicle disposition: HOLD")
     string(FIND "${combined_output}" "${expected_line}" match_position)
     if(match_position EQUAL -1)
