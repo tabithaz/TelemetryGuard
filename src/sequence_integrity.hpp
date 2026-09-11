@@ -41,6 +41,6 @@ inline SequenceIntegrity analyze_sequence_integrity(
         sequence_numbers.size(),
         missing,
         loss_percent,
-        loss_percent >= degraded_loss_percent,
+        missing > 0 && loss_percent >= degraded_loss_percent,
     };
 }

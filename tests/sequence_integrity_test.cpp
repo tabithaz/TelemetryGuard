@@ -12,6 +12,18 @@ int main() {
         return 1;
     }
 
+    const auto zeroThresholdNominal = analyze_sequence_integrity({20, 21, 22}, 0.0);
+    if (zeroThresholdNominal.degraded) {
+        std::cerr << "lossless sequence should remain nominal at zero threshold\n";
+        return 1;
+    }
+
+    const auto zeroThresholdLoss = analyze_sequence_integrity({20, 22}, 0.0);
+    if (!zeroThresholdLoss.degraded || zeroThresholdLoss.missing_packets != 1) {
+        std::cerr << "packet loss should degrade at zero threshold\n";
+        return 1;
+    }
+
     const auto gapped = analyze_sequence_integrity({10, 11, 14, 15}, 20.0);
     if (gapped.observed_packets != 4 || gapped.missing_packets != 2) {
         std::cerr << "packet accounting mismatch\n";
