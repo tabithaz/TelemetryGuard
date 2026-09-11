@@ -32,6 +32,20 @@ jobs:
       - name: Test synthetic health check
         run: ctest --test-dir build --output-on-failure
 
+  portability:
+    runs-on: macos-latest
+    name: Apple Clang release build
+    env:
+      CXXFLAGS: -Wall -Wextra -Wpedantic -Werror
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build --config Release --parallel
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
   sanitizers:
     runs-on: ubuntu-latest
     name: Address and undefined behavior sanitizers
