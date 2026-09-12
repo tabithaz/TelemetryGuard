@@ -20,7 +20,8 @@ inline JitterAnalysis analyze_jitter(
     if (timestamps_ms.size() < 2) {
         throw std::invalid_argument("at least two timestamps are required");
     }
-    if (expected_interval_ms <= 0.0 || tolerance_ms < 0.0) {
+    if (!std::isfinite(expected_interval_ms) || !std::isfinite(tolerance_ms) ||
+        expected_interval_ms <= 0.0 || tolerance_ms < 0.0) {
         throw std::invalid_argument("invalid interval or tolerance");
     }
 
@@ -29,7 +30,14 @@ inline JitterAnalysis analyze_jitter(
     double max_jitter = 0.0;
     std::size_t violations = 0;
 
-    for (std::size_t i = 1; i < timestamps_ms.size(); ++i) {
+    for (std::size_t i = 0; i < timestamps_ms.size(); ++i) {
+        if (!std::isfinite(timestamps_ms[i])) {
+            throw std::invalid_argument("timestamps must be finite");
+        }
+        if (i == 0) {
+            continue;
+        }
+
         const double interval = timestamps_ms[i] - timestamps_ms[i - 1];
         if (interval <= 0.0) {
             throw std::invalid_argument("timestamps must be strictly increasing");

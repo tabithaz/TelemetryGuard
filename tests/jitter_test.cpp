@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <iostream>
+#include <limits>
 #include <stdexcept>
 
 bool near(double a, double b) { return std::abs(a - b) < 1e-9; }
@@ -16,6 +17,24 @@ int main() {
     try {
         analyze_jitter({0.0, 0.0}, 100.0, 5.0);
         return 3;
+    } catch (const std::invalid_argument&) {
+    }
+
+    try {
+        analyze_jitter({0.0, std::numeric_limits<double>::infinity()}, 100.0, 5.0);
+        return 4;
+    } catch (const std::invalid_argument&) {
+    }
+
+    try {
+        analyze_jitter({0.0, 100.0}, std::numeric_limits<double>::quiet_NaN(), 5.0);
+        return 5;
+    } catch (const std::invalid_argument&) {
+    }
+
+    try {
+        analyze_jitter({0.0, 100.0}, 100.0, std::numeric_limits<double>::infinity());
+        return 6;
     } catch (const std::invalid_argument&) {
     }
 
