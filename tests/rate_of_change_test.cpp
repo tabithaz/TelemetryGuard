@@ -1,5 +1,6 @@
 #include <cmath>
 #include <iostream>
+#include <limits>
 
 #include "../src/rate_of_change.hpp"
 
@@ -25,6 +26,30 @@ int main() {
     try {
         telemetry::analyze_rate_of_change(1.0, 2.0, 0.0, 1.0);
         std::cerr << "zero elapsed time should be rejected\n";
+        return 1;
+    } catch (const std::invalid_argument&) {
+    }
+
+    const double nan = std::numeric_limits<double>::quiet_NaN();
+    const double infinity = std::numeric_limits<double>::infinity();
+
+    try {
+        telemetry::analyze_rate_of_change(nan, 2.0, 1.0, 1.0);
+        std::cerr << "non-finite telemetry value should be rejected\n";
+        return 1;
+    } catch (const std::invalid_argument&) {
+    }
+
+    try {
+        telemetry::analyze_rate_of_change(1.0, 2.0, infinity, 1.0);
+        std::cerr << "non-finite elapsed time should be rejected\n";
+        return 1;
+    } catch (const std::invalid_argument&) {
+    }
+
+    try {
+        telemetry::analyze_rate_of_change(1.0, 2.0, 1.0, nan);
+        std::cerr << "non-finite rate threshold should be rejected\n";
         return 1;
     } catch (const std::invalid_argument&) {
     }
