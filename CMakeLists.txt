@@ -13,6 +13,7 @@ add_executable(freshness_test tests/freshness_test.cpp)
 add_executable(jitter_test tests/jitter_test.cpp)
 add_executable(dropout_test tests/dropout_test.cpp)
 add_executable(saturation_test tests/saturation_test.cpp)
+add_executable(sensor_agreement_test tests/sensor_agreement_test.cpp)
 
 target_compile_options(telemetry_guard PRIVATE
     $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall -Wextra -Wpedantic>
@@ -38,6 +39,9 @@ target_compile_options(dropout_test PRIVATE
 target_compile_options(saturation_test PRIVATE
     $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall -Wextra -Wpedantic>
 )
+target_compile_options(sensor_agreement_test PRIVATE
+    $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall -Wextra -Wpedantic>
+)
 
 enable_testing()
 add_test(
@@ -53,3 +57,4 @@ add_test(NAME freshness_analysis COMMAND freshness_test)
 add_test(NAME jitter_analysis COMMAND jitter_test)
 add_test(NAME dropout_analysis COMMAND dropout_test)
 add_test(NAME saturation_analysis COMMAND saturation_test)
+add_test(NAME sensor_agreement_analysis COMMAND sensor_agreement_test)
