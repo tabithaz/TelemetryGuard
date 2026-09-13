@@ -1,6 +1,7 @@
 #include "../src/saturation.hpp"
 #include <cmath>
 #include <iostream>
+#include <limits>
 
 int main() {
     const auto nominal = analyze_saturation({1.0, 2.0, 3.0}, 0.0, 10.0);
@@ -13,6 +14,24 @@ int main() {
     try {
         (void)analyze_saturation({1.0}, 10.0, 0.0);
         return 4;
+    } catch (const std::invalid_argument&) {
+    }
+
+    try {
+        (void)analyze_saturation({1.0, std::numeric_limits<double>::quiet_NaN()}, 0.0, 10.0);
+        return 5;
+    } catch (const std::invalid_argument&) {
+    }
+
+    try {
+        (void)analyze_saturation({1.0}, -std::numeric_limits<double>::infinity(), 10.0);
+        return 6;
+    } catch (const std::invalid_argument&) {
+    }
+
+    try {
+        (void)analyze_saturation({1.0}, 0.0, std::numeric_limits<double>::infinity());
+        return 7;
     } catch (const std::invalid_argument&) {
     }
 

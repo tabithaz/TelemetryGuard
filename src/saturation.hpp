@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cmath>
 #include <cstddef>
 #include <stdexcept>
 #include <vector>
@@ -17,6 +18,9 @@ inline SaturationAnalysis analyze_saturation(
     double upper_limit,
     std::size_t persistent_run_threshold = 3) {
     if (samples.empty()) throw std::invalid_argument("samples must not be empty");
+    if (!std::isfinite(lower_limit) || !std::isfinite(upper_limit)) {
+        throw std::invalid_argument("saturation limits must be finite");
+    }
     if (lower_limit >= upper_limit) throw std::invalid_argument("lower_limit must be below upper_limit");
     if (persistent_run_threshold == 0) throw std::invalid_argument("persistent_run_threshold must be positive");
 
@@ -24,6 +28,7 @@ inline SaturationAnalysis analyze_saturation(
     std::size_t current_run = 0;
     std::size_t longest_run = 0;
     for (double value : samples) {
+        if (!std::isfinite(value)) throw std::invalid_argument("samples must be finite");
         const bool is_saturated = value <= lower_limit || value >= upper_limit;
         if (is_saturated) {
             ++saturated;
