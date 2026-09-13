@@ -19,8 +19,14 @@ inline FrozenSignalResult analyze_frozen_signal(
     if (values.empty()) {
         throw std::invalid_argument("values cannot be empty");
     }
-    if (epsilon < 0.0 || run_threshold < 2) {
+    if (!std::isfinite(epsilon) || epsilon < 0.0 || run_threshold < 2) {
         throw std::invalid_argument("invalid frozen-signal settings");
+    }
+
+    for (const double value : values) {
+        if (!std::isfinite(value)) {
+            throw std::invalid_argument("telemetry values must be finite");
+        }
     }
 
     std::size_t longest = 1;
