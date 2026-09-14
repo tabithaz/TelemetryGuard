@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <iostream>
+#include <limits>
 #include <stdexcept>
 #include <vector>
 
@@ -36,6 +37,39 @@ int main() {
         mismatch_rejected = true;
     }
     require(mismatch_rejected, "mismatched sensor streams must be rejected");
+
+    bool non_finite_primary_rejected = false;
+    try {
+        (void)analyze_sensor_agreement(
+            {1.0, std::numeric_limits<double>::quiet_NaN()},
+            {1.0, 2.0},
+            0.1);
+    } catch (const std::invalid_argument&) {
+        non_finite_primary_rejected = true;
+    }
+    require(non_finite_primary_rejected, "non-finite primary samples must be rejected");
+
+    bool non_finite_redundant_rejected = false;
+    try {
+        (void)analyze_sensor_agreement(
+            {1.0, 2.0},
+            {1.0, std::numeric_limits<double>::infinity()},
+            0.1);
+    } catch (const std::invalid_argument&) {
+        non_finite_redundant_rejected = true;
+    }
+    require(non_finite_redundant_rejected, "non-finite redundant samples must be rejected");
+
+    bool non_finite_tolerance_rejected = false;
+    try {
+        (void)analyze_sensor_agreement(
+            {1.0},
+            {1.0},
+            std::numeric_limits<double>::infinity());
+    } catch (const std::invalid_argument&) {
+        non_finite_tolerance_rejected = true;
+    }
+    require(non_finite_tolerance_rejected, "non-finite tolerance must be rejected");
 
     std::cout << "sensor agreement analysis passed\n";
     return 0;

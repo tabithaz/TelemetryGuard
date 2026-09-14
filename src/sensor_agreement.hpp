@@ -18,8 +18,8 @@ inline SensorAgreementAnalysis analyze_sensor_agreement(
     const std::vector<double>& primary,
     const std::vector<double>& redundant,
     double tolerance) {
-    if (tolerance < 0.0) {
-        throw std::invalid_argument("tolerance must be non-negative");
+    if (!std::isfinite(tolerance) || tolerance < 0.0) {
+        throw std::invalid_argument("tolerance must be finite and non-negative");
     }
     if (primary.size() != redundant.size()) {
         throw std::invalid_argument("sensor streams must have equal length");
@@ -33,6 +33,10 @@ inline SensorAgreementAnalysis analyze_sensor_agreement(
     std::size_t disagreements = 0;
 
     for (std::size_t i = 0; i < primary.size(); ++i) {
+        if (!std::isfinite(primary[i]) || !std::isfinite(redundant[i])) {
+            throw std::invalid_argument("sensor values must be finite");
+        }
+
         const double difference = std::abs(primary[i] - redundant[i]);
         total_difference += difference;
         max_difference = std::max(max_difference, difference);
