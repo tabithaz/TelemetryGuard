@@ -16,6 +16,7 @@ add_executable(saturation_test tests/saturation_test.cpp)
 add_executable(sensor_agreement_test tests/sensor_agreement_test.cpp)
 add_executable(frozen_signal_test tests/frozen_signal_test.cpp)
 add_executable(sensor_drift_test tests/sensor_drift_test.cpp)
+add_executable(spike_detection_test tests/spike_detection_test.cpp)
 
 target_compile_options(telemetry_guard PRIVATE
     $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall -Wextra -Wpedantic>
@@ -50,6 +51,9 @@ target_compile_options(frozen_signal_test PRIVATE
 target_compile_options(sensor_drift_test PRIVATE
     $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall -Wextra -Wpedantic>
 )
+target_compile_options(spike_detection_test PRIVATE
+    $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall -Wextra -Wpedantic>
+)
 
 enable_testing()
 add_test(
@@ -68,3 +72,4 @@ add_test(NAME saturation_analysis COMMAND saturation_test)
 add_test(NAME sensor_agreement_analysis COMMAND sensor_agreement_test)
 add_test(NAME frozen_signal_analysis COMMAND frozen_signal_test)
 add_test(NAME sensor_drift_analysis COMMAND sensor_drift_test)
+add_test(NAME spike_detection_analysis COMMAND spike_detection_test)
