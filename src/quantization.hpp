@@ -20,7 +20,8 @@ inline QuantizationReport analyze_quantization(
     if (values.size() < 2) {
         throw std::invalid_argument("at least two samples are required");
     }
-    if (!(expected_resolution > 0.0) || tolerance_ratio < 0.0) {
+    if (!std::isfinite(expected_resolution) || !std::isfinite(tolerance_ratio)
+        || expected_resolution <= 0.0 || tolerance_ratio < 0.0) {
         throw std::invalid_argument("invalid quantization settings");
     }
 
