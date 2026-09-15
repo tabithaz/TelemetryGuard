@@ -1,5 +1,6 @@
 #include "../src/noise_floor.hpp"
 
+#include <limits>
 #include <stdexcept>
 
 int main() {
@@ -15,6 +16,24 @@ int main() {
     try {
         analyze_noise_floor({1.0}, 0.01, 1.0);
         return 4;
+    } catch (const std::invalid_argument&) {
+    }
+
+    try {
+        analyze_noise_floor({1.0, 2.0}, std::numeric_limits<double>::infinity(), 1.0);
+        return 5;
+    } catch (const std::invalid_argument&) {
+    }
+
+    try {
+        analyze_noise_floor({1.0, 2.0}, 0.01, std::numeric_limits<double>::quiet_NaN());
+        return 6;
+    } catch (const std::invalid_argument&) {
+    }
+
+    try {
+        analyze_noise_floor({1.0, 2.0}, 0.01, 1.0, std::numeric_limits<double>::infinity());
+        return 7;
     } catch (const std::invalid_argument&) {
     }
     return 0;

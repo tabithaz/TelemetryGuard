@@ -18,7 +18,8 @@ inline NoiseFloorReport analyze_noise_floor(
     double max_rms_delta,
     double max_quiet_percent = 95.0) {
     if (values.size() < 2) throw std::invalid_argument("at least two samples are required");
-    if (quiet_threshold < 0.0 || max_rms_delta <= 0.0 || max_quiet_percent < 0.0 || max_quiet_percent > 100.0)
+    if (!std::isfinite(quiet_threshold) || !std::isfinite(max_rms_delta) || !std::isfinite(max_quiet_percent) ||
+        quiet_threshold < 0.0 || max_rms_delta <= 0.0 || max_quiet_percent < 0.0 || max_quiet_percent > 100.0)
         throw std::invalid_argument("invalid noise-floor settings");
 
     double sum = 0.0;
