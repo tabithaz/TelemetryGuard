@@ -9,6 +9,7 @@ struct DropoutAnalysis {
     std::size_t dropout_events;
     std::size_t total_missing_packets;
     std::size_t longest_dropout;
+    double missing_packet_percent;
     bool sustained_dropout;
 };
 
@@ -37,10 +38,16 @@ inline DropoutAnalysis analyze_dropouts(
         }
     }
 
+    const std::size_t expected_packets = sequence_numbers.size() + total_missing;
+    const double missing_percent = expected_packets == 0
+        ? 0.0
+        : 100.0 * static_cast<double>(total_missing) / static_cast<double>(expected_packets);
+
     return {
         dropout_events,
         total_missing,
         longest_dropout,
+        missing_percent,
         longest_dropout >= sustained_threshold,
     };
 }
