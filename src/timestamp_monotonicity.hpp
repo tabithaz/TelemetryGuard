@@ -9,6 +9,7 @@ struct TimestampMonotonicityReport {
     std::size_t regression_count;
     std::size_t duplicate_count;
     double regression_rate_percent;
+    double duplicate_rate_percent;
     bool degraded;
 };
 
@@ -38,11 +39,13 @@ inline TimestampMonotonicityReport analyze_timestamp_monotonicity(
 
     const auto intervals = static_cast<double>(timestamps.size() - 1);
     const double regression_rate = 100.0 * static_cast<double>(regressions) / intervals;
+    const double duplicate_rate = 100.0 * static_cast<double>(duplicates) / intervals;
 
     return {
         regressions,
         duplicates,
         regression_rate,
+        duplicate_rate,
         regressions > 0 || duplicates > allowed_duplicates,
     };
 }
