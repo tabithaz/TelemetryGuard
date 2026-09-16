@@ -22,8 +22,9 @@ add_executable(checksum_integrity_test tests/checksum_integrity_test.cpp)
 add_executable(noise_floor_test tests/noise_floor_test.cpp)
 add_executable(timestamp_monotonicity_test tests/timestamp_monotonicity_test.cpp)
 add_executable(gap_timing_test tests/gap_timing_test.cpp)
+add_executable(outlier_run_test tests/outlier_run_test.cpp)
 
-foreach(target telemetry_guard limit_margin_test rate_of_change_test sequence_integrity_test freshness_test jitter_test dropout_test saturation_test sensor_agreement_test frozen_signal_test sensor_drift_test spike_detection_test quantization_test checksum_integrity_test noise_floor_test timestamp_monotonicity_test gap_timing_test)
+foreach(target telemetry_guard limit_margin_test rate_of_change_test sequence_integrity_test freshness_test jitter_test dropout_test saturation_test sensor_agreement_test frozen_signal_test sensor_drift_test spike_detection_test quantization_test checksum_integrity_test noise_floor_test timestamp_monotonicity_test gap_timing_test outlier_run_test)
     target_compile_options(${target} PRIVATE
         $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall -Wextra -Wpedantic>
     )
@@ -52,3 +53,4 @@ add_test(NAME checksum_integrity_analysis COMMAND checksum_integrity_test)
 add_test(NAME noise_floor_analysis COMMAND noise_floor_test)
 add_test(NAME timestamp_monotonicity_analysis COMMAND timestamp_monotonicity_test)
 add_test(NAME gap_timing_analysis COMMAND gap_timing_test)
+add_test(NAME outlier_run_analysis COMMAND outlier_run_test)
