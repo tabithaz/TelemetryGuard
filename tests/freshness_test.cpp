@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <iostream>
+#include <limits>
 #include <stdexcept>
 #include <string>
 
@@ -33,6 +34,22 @@ int main() {
         rejected_negative_age = true;
     }
     require(rejected_negative_age, "negative ages must be rejected");
+
+    bool rejected_nonfinite_age = false;
+    try {
+        (void)analyze_freshness({0.2, std::numeric_limits<double>::infinity()}, 1.0);
+    } catch (const std::invalid_argument&) {
+        rejected_nonfinite_age = true;
+    }
+    require(rejected_nonfinite_age, "non-finite ages must be rejected");
+
+    bool rejected_nonfinite_threshold = false;
+    try {
+        (void)analyze_freshness({0.2, 0.4}, std::numeric_limits<double>::quiet_NaN());
+    } catch (const std::invalid_argument&) {
+        rejected_nonfinite_threshold = true;
+    }
+    require(rejected_nonfinite_threshold, "non-finite thresholds must be rejected");
 
     std::cout << "freshness diagnostics passed\n";
     return 0;

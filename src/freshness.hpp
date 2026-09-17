@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <cmath>
 #include <stdexcept>
 #include <vector>
 
@@ -18,7 +19,8 @@ inline FreshnessResult analyze_freshness(
     if (ages_seconds.empty()) {
         throw std::invalid_argument("ages_seconds must not be empty");
     }
-    if (stale_threshold_seconds <= 0.0 || critical_stale_percentage < 0.0 || critical_stale_percentage > 100.0) {
+    if (!std::isfinite(stale_threshold_seconds) || !std::isfinite(critical_stale_percentage) ||
+        stale_threshold_seconds <= 0.0 || critical_stale_percentage < 0.0 || critical_stale_percentage > 100.0) {
         throw std::invalid_argument("freshness thresholds are invalid");
     }
 
@@ -27,8 +29,8 @@ inline FreshnessResult analyze_freshness(
     double maximum_age = 0.0;
 
     for (double age : ages_seconds) {
-        if (age < 0.0) {
-            throw std::invalid_argument("telemetry age cannot be negative");
+        if (!std::isfinite(age) || age < 0.0) {
+            throw std::invalid_argument("telemetry age must be finite and non-negative");
         }
         total_age += age;
         maximum_age = std::max(maximum_age, age);
