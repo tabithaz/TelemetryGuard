@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <iostream>
+#include <limits>
 #include <stdexcept>
 #include <vector>
 
@@ -44,6 +45,22 @@ int main() {
     try {
         (void)analyze_sequence_integrity({1, 2}, 101.0);
         std::cerr << "invalid threshold should fail\n";
+        return 1;
+    } catch (const std::invalid_argument&) {
+    }
+
+    try {
+        (void)analyze_sequence_integrity(
+            {1, 2}, std::numeric_limits<double>::quiet_NaN());
+        std::cerr << "NaN threshold should fail\n";
+        return 1;
+    } catch (const std::invalid_argument&) {
+    }
+
+    try {
+        (void)analyze_sequence_integrity(
+            {1, 2}, std::numeric_limits<double>::infinity());
+        std::cerr << "infinite threshold should fail\n";
         return 1;
     } catch (const std::invalid_argument&) {
     }

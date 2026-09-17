@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <stdexcept>
@@ -15,8 +16,9 @@ struct SequenceIntegrity {
 inline SequenceIntegrity analyze_sequence_integrity(
     const std::vector<std::uint64_t>& sequence_numbers,
     double degraded_loss_percent = 1.0) {
-    if (degraded_loss_percent < 0.0 || degraded_loss_percent > 100.0) {
-        throw std::invalid_argument("degraded loss threshold must be between 0 and 100");
+    if (!std::isfinite(degraded_loss_percent) ||
+        degraded_loss_percent < 0.0 || degraded_loss_percent > 100.0) {
+        throw std::invalid_argument("degraded loss threshold must be finite and between 0 and 100");
     }
 
     if (sequence_numbers.empty()) {
