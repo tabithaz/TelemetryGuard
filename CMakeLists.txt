@@ -26,8 +26,9 @@ add_executable(outlier_run_test tests/outlier_run_test.cpp)
 add_executable(bias_shift_test tests/bias_shift_test.cpp)
 add_executable(variance_shift_test tests/variance_shift_test.cpp)
 add_executable(range_utilization_test tests/range_utilization_test.cpp)
+add_executable(slew_rate_test tests/slew_rate_test.cpp)
 
-foreach(target telemetry_guard limit_margin_test rate_of_change_test sequence_integrity_test freshness_test jitter_test dropout_test saturation_test sensor_agreement_test frozen_signal_test sensor_drift_test spike_detection_test quantization_test checksum_integrity_test noise_floor_test timestamp_monotonicity_test gap_timing_test outlier_run_test bias_shift_test variance_shift_test range_utilization_test)
+foreach(target telemetry_guard limit_margin_test rate_of_change_test sequence_integrity_test freshness_test jitter_test dropout_test saturation_test sensor_agreement_test frozen_signal_test sensor_drift_test spike_detection_test quantization_test checksum_integrity_test noise_floor_test timestamp_monotonicity_test gap_timing_test outlier_run_test bias_shift_test variance_shift_test range_utilization_test slew_rate_test)
     target_compile_options(${target} PRIVATE
         $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall -Wextra -Wpedantic>
     )
@@ -60,3 +61,4 @@ add_test(NAME outlier_run_analysis COMMAND outlier_run_test)
 add_test(NAME bias_shift_analysis COMMAND bias_shift_test)
 add_test(NAME variance_shift_analysis COMMAND variance_shift_test)
 add_test(NAME range_utilization_analysis COMMAND range_utilization_test)
+add_test(NAME slew_rate_analysis COMMAND slew_rate_test)
