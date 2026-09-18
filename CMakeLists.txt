@@ -28,6 +28,7 @@ add_executable(variance_shift_test tests/variance_shift_test.cpp)
 add_executable(range_utilization_test tests/range_utilization_test.cpp)
 add_executable(slew_rate_test tests/slew_rate_test.cpp)
 add_executable(deadband_test tests/deadband_test.cpp)
+add_executable(step_change_test tests/step_change_test.cpp)
 
 set(telemetry_targets
     telemetry_guard limit_margin_test rate_of_change_test sequence_integrity_test
@@ -35,7 +36,7 @@ set(telemetry_targets
     frozen_signal_test sensor_drift_test spike_detection_test quantization_test
     checksum_integrity_test noise_floor_test timestamp_monotonicity_test gap_timing_test
     outlier_run_test bias_shift_test variance_shift_test range_utilization_test
-    slew_rate_test deadband_test
+    slew_rate_test deadband_test step_change_test
 )
 
 foreach(target ${telemetry_targets})
@@ -74,3 +75,4 @@ add_test(NAME variance_shift_analysis COMMAND variance_shift_test)
 add_test(NAME range_utilization_analysis COMMAND range_utilization_test)
 add_test(NAME slew_rate_analysis COMMAND slew_rate_test)
 add_test(NAME deadband_analysis COMMAND deadband_test)
+add_test(NAME step_change_analysis COMMAND step_change_test)
