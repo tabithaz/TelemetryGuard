@@ -10,6 +10,7 @@
 struct SequenceIntegrity {
     std::size_t observed_packets;
     std::size_t missing_packets;
+    std::size_t gap_events;
     std::size_t largest_gap_packets;
     double loss_percent;
     bool degraded;
@@ -24,10 +25,11 @@ inline SequenceIntegrity analyze_sequence_integrity(
     }
 
     if (sequence_numbers.empty()) {
-        return {0, 0, 0, 0.0, false};
+        return {0, 0, 0, 0, 0.0, false};
     }
 
     std::size_t missing = 0;
+    std::size_t gap_events = 0;
     std::size_t largest_gap = 0;
     for (std::size_t i = 1; i < sequence_numbers.size(); ++i) {
         if (sequence_numbers[i] <= sequence_numbers[i - 1]) {
@@ -36,6 +38,9 @@ inline SequenceIntegrity analyze_sequence_integrity(
         const auto gap = static_cast<std::size_t>(
             sequence_numbers[i] - sequence_numbers[i - 1] - 1);
         missing += gap;
+        if (gap > 0) {
+            ++gap_events;
+        }
         largest_gap = std::max(largest_gap, gap);
     }
 
@@ -47,6 +52,7 @@ inline SequenceIntegrity analyze_sequence_integrity(
     return {
         sequence_numbers.size(),
         missing,
+        gap_events,
         largest_gap,
         loss_percent,
         missing > 0 && loss_percent >= degraded_loss_percent,

@@ -8,7 +8,8 @@
 
 int main() {
     const auto nominal = analyze_sequence_integrity({100, 101, 102, 103});
-    if (nominal.missing_packets != 0 || nominal.largest_gap_packets != 0 || nominal.degraded) {
+    if (nominal.missing_packets != 0 || nominal.gap_events != 0 ||
+        nominal.largest_gap_packets != 0 || nominal.degraded) {
         std::cerr << "nominal sequence should not be degraded\n";
         return 1;
     }
@@ -20,14 +21,15 @@ int main() {
     }
 
     const auto zeroThresholdLoss = analyze_sequence_integrity({20, 22}, 0.0);
-    if (!zeroThresholdLoss.degraded || zeroThresholdLoss.missing_packets != 1) {
+    if (!zeroThresholdLoss.degraded || zeroThresholdLoss.missing_packets != 1 ||
+        zeroThresholdLoss.gap_events != 1) {
         std::cerr << "packet loss should degrade at zero threshold\n";
         return 1;
     }
 
     const auto gapped = analyze_sequence_integrity({10, 11, 14, 15, 20}, 20.0);
     if (gapped.observed_packets != 5 || gapped.missing_packets != 6 ||
-        gapped.largest_gap_packets != 4) {
+        gapped.gap_events != 2 || gapped.largest_gap_packets != 4) {
         std::cerr << "packet accounting mismatch\n";
         return 1;
     }
