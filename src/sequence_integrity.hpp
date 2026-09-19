@@ -12,6 +12,7 @@ struct SequenceIntegrity {
     std::size_t missing_packets;
     std::size_t gap_events;
     std::size_t largest_gap_packets;
+    double average_gap_packets;
     double loss_percent;
     bool degraded;
 };
@@ -25,7 +26,7 @@ inline SequenceIntegrity analyze_sequence_integrity(
     }
 
     if (sequence_numbers.empty()) {
-        return {0, 0, 0, 0, 0.0, false};
+        return {0, 0, 0, 0, 0.0, 0.0, false};
     }
 
     std::size_t missing = 0;
@@ -45,6 +46,9 @@ inline SequenceIntegrity analyze_sequence_integrity(
     }
 
     const std::size_t expected = sequence_numbers.size() + missing;
+    const double average_gap = gap_events == 0
+        ? 0.0
+        : static_cast<double>(missing) / static_cast<double>(gap_events);
     const double loss_percent = expected == 0
         ? 0.0
         : (static_cast<double>(missing) / static_cast<double>(expected)) * 100.0;
@@ -54,6 +58,7 @@ inline SequenceIntegrity analyze_sequence_integrity(
         missing,
         gap_events,
         largest_gap,
+        average_gap,
         loss_percent,
         missing > 0 && loss_percent >= degraded_loss_percent,
     };
