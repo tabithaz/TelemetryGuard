@@ -1,51 +1,104 @@
 # TelemetryGuard
 
-TelemetryGuard is a lightweight C++ telemetry monitoring tool inspired by aerospace vehicle health-monitoring systems. It evaluates synthetic vehicle telemetry against configurable value and freshness limits, then produces channel-level status and an overall vehicle health summary.
+TelemetryGuard is a C++17 telemetry health-monitoring project inspired by aerospace vehicle operations. It evaluates synthetic channel data, classifies telemetry quality, summarizes vehicle health, and exposes reusable diagnostics for timing, integrity, and signal-behavior faults.
 
-The project uses synthetic data only and is intended as a small systems-programming and telemetry-validation project.
+All scenarios are synthetic and contain no operational data.
 
-## Current capabilities
+## What it demonstrates
 
-- Configurable warning and critical value thresholds per telemetry channel
-- Freshness thresholds for aging and stale telemetry
-- Detection of missing values, invalid timestamps, and invalid threshold configurations
-- Channel-level status classification with priority diagnostics
-- Vehicle health score, health band, availability, and degradation metrics
-- GO, MONITOR, and HOLD vehicle dispositions
-- Script-friendly exit codes for downstream tooling
-- CTest regression coverage for the synthetic health scenario
+- Defensive validation of telemetry values, timestamps, and channel configuration
+- Warning and critical limit evaluation with freshness-aware status classification
+- GO, MONITOR, and HOLD vehicle dispositions with script-friendly exit codes
+- Health score, availability, degradation, and priority-channel reporting
+- Small header-only diagnostic components with focused regression tests
+- Portable CMake builds and CI across GCC, Clang, and Apple Clang
+- AddressSanitizer and UndefinedBehaviorSanitizer validation in CI
 
-## Synthetic telemetry channels
+## Diagnostic coverage
 
-The built-in scenario currently exercises channels such as altitude, velocity, temperature, pressure, battery voltage, fuel level, guidance quality, and navigation updates. These values and scenarios are synthetic and are not derived from operational systems.
+TelemetryGuard includes focused analyzers for:
 
-## Build and run
+| Area | Diagnostics |
+| --- | --- |
+| Value limits | limit margin, saturation, slew rate, rate of change, step change |
+| Signal behavior | bias shift, variance shift, noise floor, oscillation, flatline, frozen signal, deadband, quantization, spikes, outlier runs |
+| Timing and delivery | freshness, jitter, packet gaps, dropout, timestamp drift, timestamp monotonicity |
+| Data integrity | checksum integrity, sequence integrity, counter regression, stuck bits |
+| Redundancy and range | sensor agreement, sensor drift, range utilization |
+
+Each analyzer has a matching executable regression test registered with CTest.
+
+## Build
+
+Requirements:
+
+- CMake 3.16 or newer
+- A C++17 compiler
 
 ```bash
-cmake -S . -B build
-cmake --build build
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --parallel
+```
+
+## Run the synthetic vehicle health check
+
+```bash
 ./build/telemetry_guard
 ```
 
-The executable returns an exit code that matches the vehicle disposition:
+The built-in scenario reports channel statuses followed by a mission-style summary:
+
+```text
+Nominal readings: 2
+Warnings: 1
+Critical alerts: 1
+Aging readings: 1
+Stale readings: 1
+Missing readings: 1
+Invalid timestamps: 1
+Vehicle disposition: HOLD
+```
+
+The executable returns an exit code matching the final disposition:
 
 | Disposition | Exit code | Meaning |
 | --- | ---: | --- |
 | `GO` | 0 | All monitored telemetry is nominal |
-| `MONITOR` | 1 | One or more warning or aging conditions are present |
-| `HOLD` | 2 | A blocking condition such as critical, stale, missing, invalid-timestamp, or configuration-error telemetry is present |
+| `MONITOR` | 1 | At least one warning or aging condition is present |
+| `HOLD` | 2 | A blocking condition is present |
 
-## Test
+Blocking conditions include critical values, stale or missing data, invalid timestamps, and invalid channel configuration.
+
+## Run the test suite
 
 ```bash
 ctest --test-dir build --output-on-failure
 ```
 
-The regression test validates the expected synthetic health summary and HOLD exit behavior.
+The suite covers the end-to-end synthetic health check plus every reusable diagnostic component. The GitHub Actions workflow builds and tests release configurations on Linux and macOS, treats compiler warnings as errors, and runs the Linux suite with address and undefined-behavior sanitizers.
 
-## Roadmap
+## Project structure
 
-- Separate telemetry evaluation logic from the command-line application
-- Load telemetry samples from CSV for playback
-- Add structured event logging
-- Add focused unit tests for individual status and health calculations
+```text
+.
+├── src/
+│   ├── main.cpp                 # synthetic health-check application
+│   └── *.hpp                    # reusable telemetry diagnostics
+├── tests/
+│   ├── *_test.cpp               # focused diagnostic regression tests
+│   └── synthetic_health_check.cmake
+├── .github/workflows/build.yml  # compiler matrix and sanitizer CI
+└── CMakeLists.txt
+```
+
+## Design notes
+
+The command-line application assigns the most severe applicable state to each channel. Configuration errors and unavailable data are checked before normal limit evaluation so an invalid reading cannot be mistaken for nominal telemetry. The summary then aggregates those states into availability, degradation, health score, priority channel, and final disposition.
+
+The reusable analyzers are intentionally small and dependency-free. This keeps them easy to test in isolation and makes their behavior explicit enough for systems-oriented code review.
+
+## Next milestones
+
+- Integrate selected diagnostics into a configurable monitoring pipeline
+- Add CSV playback for repeatable telemetry scenarios
+- Emit structured event logs for downstream analysis
