@@ -54,7 +54,7 @@ foreach(target ${telemetry_targets})
     if(TARGET ${target})
         target_include_directories(${target} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
         target_compile_options(${target} PRIVATE
-            $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall -Wextra -Wpedantic -UNDEBUG>
+            $<$<CXX_COMPILER_ID:GNU,Clang,AppleClang>:-Wall -Wextra -Wpedantic -UNDEBUG>
         )
     endif()
 endforeach()
