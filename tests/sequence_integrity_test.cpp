@@ -10,7 +10,8 @@ int main() {
     const auto nominal = analyze_sequence_integrity({100, 101, 102, 103});
     if (nominal.missing_packets != 0 || nominal.gap_events != 0 ||
         nominal.largest_gap_packets != 0 || nominal.average_gap_packets != 0.0 ||
-        nominal.burst_loss_percent != 0.0 || nominal.degraded) {
+        nominal.median_gap_packets != 0.0 || nominal.burst_loss_percent != 0.0 ||
+        nominal.degraded) {
         std::cerr << "nominal sequence should not be degraded\n";
         return 1;
     }
@@ -24,6 +25,7 @@ int main() {
     const auto zeroThresholdLoss = analyze_sequence_integrity({20, 22}, 0.0);
     if (!zeroThresholdLoss.degraded || zeroThresholdLoss.missing_packets != 1 ||
         zeroThresholdLoss.gap_events != 1 || zeroThresholdLoss.average_gap_packets != 1.0 ||
+        zeroThresholdLoss.median_gap_packets != 1.0 ||
         zeroThresholdLoss.burst_loss_percent != 100.0) {
         std::cerr << "packet loss should degrade at zero threshold\n";
         return 1;
@@ -35,8 +37,9 @@ int main() {
         std::cerr << "packet accounting mismatch\n";
         return 1;
     }
-    if (std::fabs(gapped.average_gap_packets - 3.0) > 0.001) {
-        std::cerr << "average packet gap calculation mismatch\n";
+    if (std::fabs(gapped.average_gap_packets - 3.0) > 0.001 ||
+        std::fabs(gapped.median_gap_packets - 3.0) > 0.001) {
+        std::cerr << "packet gap statistics mismatch\n";
         return 1;
     }
     if (std::fabs(gapped.burst_loss_percent - 66.6666666667) > 0.001) {
@@ -45,6 +48,12 @@ int main() {
     }
     if (std::fabs(gapped.loss_percent - 54.5454545455) > 0.001 || !gapped.degraded) {
         std::cerr << "packet loss calculation mismatch\n";
+        return 1;
+    }
+
+    const auto unevenGaps = analyze_sequence_integrity({1, 3, 8, 10});
+    if (std::fabs(unevenGaps.median_gap_packets - 1.0) > 0.001) {
+        std::cerr << "odd packet gap median mismatch\n";
         return 1;
     }
 
