@@ -5,7 +5,10 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+include(CTest)
+
 add_executable(telemetry_guard src/main.cpp)
+if(BUILD_TESTING)
 add_executable(limit_margin_test tests/limit_margin_test.cpp)
 add_executable(rate_of_change_test tests/rate_of_change_test.cpp)
 add_executable(sequence_integrity_test tests/sequence_integrity_test.cpp)
@@ -35,6 +38,8 @@ add_executable(signal_flatline_test tests/signal_flatline_test.cpp)
 add_executable(stuck_bit_test tests/stuck_bit_test.cpp)
 add_executable(counter_regression_test tests/counter_regression_test.cpp)
 
+endif()
+
 set(telemetry_targets
     telemetry_guard limit_margin_test rate_of_change_test sequence_integrity_test
     freshness_test jitter_test dropout_test saturation_test sensor_agreement_test
@@ -46,12 +51,15 @@ set(telemetry_targets
 )
 
 foreach(target ${telemetry_targets})
-    target_include_directories(${target} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
-    target_compile_options(${target} PRIVATE
-        $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall -Wextra -Wpedantic>
-    )
+    if(TARGET ${target})
+        target_include_directories(${target} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+        target_compile_options(${target} PRIVATE
+            $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall -Wextra -Wpedantic>
+        )
+    endif()
 endforeach()
 
+if(BUILD_TESTING)
 enable_testing()
 add_test(
     NAME synthetic_health_check
@@ -87,3 +95,4 @@ add_test(NAME oscillation_analysis COMMAND oscillation_test)
 add_test(NAME signal_flatline_analysis COMMAND signal_flatline_test)
 add_test(NAME stuck_bit_analysis COMMAND stuck_bit_test)
 add_test(NAME counter_regression_analysis COMMAND counter_regression_test)
+endif()
