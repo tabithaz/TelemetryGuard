@@ -67,6 +67,10 @@ add_test(
         -DTELEMETRY_GUARD=$<TARGET_FILE:telemetry_guard>
         -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/synthetic_health_check.cmake
 )
+add_test(NAME csv_playback COMMAND ${CMAKE_COMMAND}
+    -DTELEMETRY_GUARD=$<TARGET_FILE:telemetry_guard>
+    -DCSV_FILE=${CMAKE_CURRENT_SOURCE_DIR}/examples/readings.csv
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/csv_playback.cmake)
 add_test(NAME limit_margin_analysis COMMAND limit_margin_test)
 add_test(NAME rate_of_change_analysis COMMAND rate_of_change_test)
 add_test(NAME sequence_integrity_analysis COMMAND sequence_integrity_test)
