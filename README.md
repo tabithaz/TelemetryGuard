@@ -46,6 +46,13 @@ cmake --build build --parallel
 ./build/telemetry_guard
 ```
 
+Run your own synthetic snapshot with `./build/telemetry_guard --csv examples/readings.csv`.
+The CSV header must match the example exactly. Each row has a channel name, reading,
+warning bounds, critical bounds, unit, age, warning age, and maximum age. Use `NA`
+for a missing reading. Fields are unquoted and cannot contain commas. A malformed
+file returns exit code 3 with a line number; GO, MONITOR, and HOLD still return
+0, 1, and 2 respectively.
+
 The built-in scenario reports channel statuses followed by a mission-style summary:
 
 ```text
@@ -100,5 +107,4 @@ The reusable analyzers are intentionally small and dependency-free. This keeps t
 ## Next milestones
 
 - Integrate selected diagnostics into a configurable monitoring pipeline
-- Add CSV playback for repeatable telemetry scenarios
 - Emit structured event logs for downstream analysis
