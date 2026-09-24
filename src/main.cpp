@@ -1,6 +1,9 @@
 #include <algorithm>
 #include <cmath>
 #include <iomanip>
+#include <fstream>
+#include <sstream>
+#include <stdexcept>
 #include <iostream>
 #include <limits>
 #include <string>
@@ -157,8 +160,49 @@ std::string healthBand(int healthScore) {
     return "RED";
 }
 
-int main() {
-    const std::vector<TelemetryReading> readings = {
+double parseNumber(const std::string& input) {
+    if (input == "NA") return std::numeric_limits<double>::quiet_NaN();
+    std::size_t consumed = 0;
+    const double value = std::stod(input, &consumed);
+    if (consumed != input.size()) throw std::invalid_argument("invalid number");
+    return value;
+}
+
+std::vector<TelemetryReading> readCsv(const std::string& path) {
+    std::ifstream file(path);
+    if (!file) throw std::runtime_error("cannot open input file: " + path);
+    const std::string header = "channel,value,warning_min,warning_max,critical_min,critical_max,unit,age_seconds,warning_age_seconds,max_age_seconds";
+    std::string line;
+    if (!std::getline(file, line) || line != header) throw std::runtime_error("invalid CSV header");
+    std::vector<TelemetryReading> readings;
+    std::size_t lineNumber = 1;
+    while (std::getline(file, line)) {
+        ++lineNumber;
+        try {
+            std::vector<std::string> cells;
+            std::istringstream row(line);
+            std::string cell;
+            while (std::getline(row, cell, ',')) cells.push_back(cell);
+            if (cells.size() != 10 || cells[0].empty() || cells[6].empty())
+                throw std::invalid_argument("expected ten nonempty fields");
+            readings.push_back({cells[0], parseNumber(cells[1]), parseNumber(cells[2]),
+                parseNumber(cells[3]), parseNumber(cells[4]), parseNumber(cells[5]),
+                cells[6], parseNumber(cells[7]), parseNumber(cells[8]), parseNumber(cells[9])});
+        } catch (const std::exception& error) {
+            throw std::runtime_error("CSV line " + std::to_string(lineNumber) + ": " + error.what());
+        }
+    }
+    if (file.bad()) throw std::runtime_error("failed while reading input file");
+    if (readings.empty()) throw std::runtime_error("CSV contains no readings");
+    return readings;
+}
+
+int main(int argc, char* argv[]) {
+    if (argc != 1 && (argc != 3 || std::string(argv[1]) != "--csv")) {
+        std::cerr << "Usage: telemetry_guard [--csv path]\n";
+        return 3;
+    }
+    const std::vector<TelemetryReading> sample = {
         {"Altitude", 18250.0, 0.0, 25000.0, -500.0, 27000.0, "m", 0.4, 1.5, 2.0},
         {"Velocity", 1240.0, 0.0, 1800.0, -100.0, 2000.0, "m/s", 0.7, 1.5, 2.0},
         {"Temperature", 91.5, -40.0, 85.0, -55.0, 100.0, "C", 0.3, 4.0, 5.0},
@@ -169,6 +213,13 @@ int main() {
         {"Navigation Update", 97.0, 90.0, 100.0, 80.0, 105.0, "%", 1.7, 1.5, 2.0}
     };
 
+    std::vector<TelemetryReading> readings;
+    try {
+        readings = argc == 3 ? readCsv(argv[2]) : sample;
+    } catch (const std::exception& error) {
+        std::cerr << "Input error: " << error.what() << '\n';
+        return 3;
+    }
     std::cout << "TelemetryGuard - Vehicle Health Check\n\n";
 
     int nominalCount = 0;
