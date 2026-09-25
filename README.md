@@ -64,6 +64,18 @@ Missing or non-finite values are represented as JSON `null`. The command keeps
 the same GO, MONITOR, HOLD, and input-error exit codes, which makes the JSON mode
 usable in CI checks and monitoring pipelines without parsing presentation text.
 
+Use `--prometheus` instead of `--json` to emit Prometheus exposition text for
+direct ingestion by monitoring infrastructure:
+
+```bash
+./build/telemetry_guard --csv examples/readings.csv --prometheus
+```
+
+The metrics include health score, availability, degradation, per-status channel
+counts, blocking issues, and a one-hot GO/MONITOR/HOLD disposition. This mode
+keeps the same disposition exit codes and can feed Prometheus alerts or Grafana
+dashboards without parsing the human-readable report.
+
 The built-in scenario reports channel statuses followed by a mission-style summary:
 
 ```text

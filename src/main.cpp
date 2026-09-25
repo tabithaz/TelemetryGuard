@@ -222,17 +222,24 @@ std::string jsonEscape(const std::string& value) {
 
 int main(int argc, char* argv[]) {
     bool jsonOutput = false;
+    bool prometheusOutput = false;
     std::string csvPath;
     for (int index = 1; index < argc; ++index) {
         const std::string argument = argv[index];
         if (argument == "--json" && !jsonOutput) {
             jsonOutput = true;
+        } else if (argument == "--prometheus" && !prometheusOutput) {
+            prometheusOutput = true;
         } else if (argument == "--csv" && csvPath.empty() && index + 1 < argc) {
             csvPath = argv[++index];
         } else {
-            std::cerr << "Usage: telemetry_guard [--csv path] [--json]\n";
+            std::cerr << "Usage: telemetry_guard [--csv path] [--json | --prometheus]\n";
             return 3;
         }
+    }
+    if (jsonOutput && prometheusOutput) {
+        std::cerr << "Input error: --json and --prometheus are mutually exclusive\n";
+        return 3;
     }
     const std::vector<TelemetryReading> sample = {
         {"Altitude", 18250.0, 0.0, 25000.0, -500.0, 27000.0, "m", 0.4, 1.5, 2.0},
@@ -252,7 +259,8 @@ int main(int argc, char* argv[]) {
         std::cerr << "Input error: " << error.what() << '\n';
         return 3;
     }
-    if (!jsonOutput) std::cout << "TelemetryGuard - Vehicle Health Check\n\n";
+    if (!jsonOutput && !prometheusOutput)
+        std::cout << "TelemetryGuard - Vehicle Health Check\n\n";
 
     int nominalCount = 0;
     int warningCount = 0;
@@ -271,7 +279,7 @@ int main(int argc, char* argv[]) {
     for (const auto& reading : readings) {
         const TelemetryStatus status = evaluateReading(reading);
         statuses.push_back(status);
-        if (!jsonOutput) {
+        if (!jsonOutput && !prometheusOutput) {
             std::cout << std::left << std::setw(18) << reading.channel << std::setw(10);
             if (status == TelemetryStatus::MissingData) std::cout << "N/A";
             else std::cout << reading.value;
@@ -341,6 +349,37 @@ int main(int argc, char* argv[]) {
                   << ",\"health_score\":" << healthScore
                   << ",\"health_band\":\"" << healthBand(healthScore)
                   << "\",\"disposition\":\"" << disposition << "\"}}\n";
+    } else if (prometheusOutput) {
+        std::cout << "# HELP telemetry_guard_health_score Composite telemetry health score.\n"
+                  << "# TYPE telemetry_guard_health_score gauge\n"
+                  << "telemetry_guard_health_score " << healthScore << '\n'
+                  << "# HELP telemetry_guard_availability_percent Percentage of available channels.\n"
+                  << "# TYPE telemetry_guard_availability_percent gauge\n"
+                  << "telemetry_guard_availability_percent " << std::fixed
+                  << std::setprecision(1) << availability << '\n'
+                  << "# HELP telemetry_guard_degradation_percent Percentage of degraded channels.\n"
+                  << "# TYPE telemetry_guard_degradation_percent gauge\n"
+                  << "telemetry_guard_degradation_percent " << degradation << '\n'
+                  << "# HELP telemetry_guard_channels Number of channels by status.\n"
+                  << "# TYPE telemetry_guard_channels gauge\n";
+        const std::vector<std::pair<std::string, int>> counts = {
+            {"nominal", nominalCount}, {"warning", warningCount},
+            {"critical", criticalCount}, {"aging", agingCount},
+            {"stale", staleCount}, {"missing", missingDataCount},
+            {"invalid_timestamp", invalidTimestampCount},
+            {"configuration_error", configurationErrorCount}
+        };
+        for (const auto& count : counts)
+            std::cout << "telemetry_guard_channels{status=\"" << count.first
+                      << "\"} " << count.second << '\n';
+        std::cout << "# HELP telemetry_guard_disposition Current disposition as a one-hot gauge.\n"
+                  << "# TYPE telemetry_guard_disposition gauge\n";
+        for (const char* label : {"GO", "MONITOR", "HOLD"})
+            std::cout << "telemetry_guard_disposition{disposition=\"" << label
+                      << "\"} " << (disposition == label ? 1 : 0) << '\n';
+        std::cout << "# HELP telemetry_guard_blocking_issues Number of HOLD-triggering channels.\n"
+                  << "# TYPE telemetry_guard_blocking_issues gauge\n"
+                  << "telemetry_guard_blocking_issues " << blockingIssueCount << '\n';
     } else std::cout << "\nNominal readings: " << nominalCount << '\n'
               << "Warnings: " << warningCount << '\n'
               << "Critical alerts: " << criticalCount << '\n'
