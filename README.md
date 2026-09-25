@@ -52,6 +52,8 @@ warning bounds, critical bounds, unit, age, warning age, and maximum age. Use `N
 for a missing reading. Fields are unquoted and cannot contain commas. A malformed
 file returns exit code 3 with a line number; GO, MONITOR, and HOLD still return
 0, 1, and 2 respectively.
+Channel names must be unique and cannot be blank or padded with whitespace;
+invalid input is rejected before any report or metrics are emitted.
 
 Add `--json` to emit machine-readable channel results and the complete health
 summary instead of the formatted report:

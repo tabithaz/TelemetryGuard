@@ -6,6 +6,7 @@
 #include <stdexcept>
 #include <iostream>
 #include <limits>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -175,6 +176,7 @@ std::vector<TelemetryReading> readCsv(const std::string& path) {
     std::string line;
     if (!std::getline(file, line) || line != header) throw std::runtime_error("invalid CSV header");
     std::vector<TelemetryReading> readings;
+    std::set<std::string> channelNames;
     std::size_t lineNumber = 1;
     while (std::getline(file, line)) {
         ++lineNumber;
@@ -185,6 +187,13 @@ std::vector<TelemetryReading> readCsv(const std::string& path) {
             while (std::getline(row, cell, ',')) cells.push_back(cell);
             if (cells.size() != 10 || cells[0].empty() || cells[6].empty())
                 throw std::invalid_argument("expected ten nonempty fields");
+            if (cells[0].find_first_not_of(" \t") == std::string::npos)
+                throw std::invalid_argument("channel name cannot be blank");
+            if (cells[0].find_first_not_of(" \t") != 0 ||
+                cells[0].find_last_not_of(" \t") != cells[0].size() - 1)
+                throw std::invalid_argument("channel name has surrounding whitespace");
+            if (!channelNames.insert(cells[0]).second)
+                throw std::invalid_argument("duplicate channel: " + cells[0]);
             readings.push_back({cells[0], parseNumber(cells[1]), parseNumber(cells[2]),
                 parseNumber(cells[3]), parseNumber(cells[4]), parseNumber(cells[5]),
                 cells[6], parseNumber(cells[7]), parseNumber(cells[8]), parseNumber(cells[9])});
