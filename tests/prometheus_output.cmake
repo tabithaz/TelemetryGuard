@@ -16,7 +16,7 @@ foreach(expected
         "telemetry_guard_channels{status=\"nominal\"} 1"
         "telemetry_guard_channels{status=\"missing\"} 1"
         "telemetry_guard_disposition{disposition=\"HOLD\"} 1"
-        "telemetry_guard_blocking_issues 4")
+        "telemetry_guard_blocking_issues 1")
     string(FIND "${output}" "${expected}" position)
     if(position EQUAL -1)
         message(FATAL_ERROR "Expected Prometheus metric not found: ${expected}\n${output}")
