@@ -53,6 +53,17 @@ for a missing reading. Fields are unquoted and cannot contain commas. A malforme
 file returns exit code 3 with a line number; GO, MONITOR, and HOLD still return
 0, 1, and 2 respectively.
 
+Add `--json` to emit machine-readable channel results and the complete health
+summary instead of the formatted report:
+
+```bash
+./build/telemetry_guard --csv examples/readings.csv --json
+```
+
+Missing or non-finite values are represented as JSON `null`. The command keeps
+the same GO, MONITOR, HOLD, and input-error exit codes, which makes the JSON mode
+usable in CI checks and monitoring pipelines without parsing presentation text.
+
 The built-in scenario reports channel statuses followed by a mission-style summary:
 
 ```text
