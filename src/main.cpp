@@ -197,10 +197,42 @@ std::vector<TelemetryReading> readCsv(const std::string& path) {
     return readings;
 }
 
+std::string jsonEscape(const std::string& value) {
+    std::ostringstream escaped;
+    for (const unsigned char character : value) {
+        switch (character) {
+            case '"': escaped << "\\\""; break;
+            case '\\': escaped << "\\\\"; break;
+            case '\b': escaped << "\\b"; break;
+            case '\f': escaped << "\\f"; break;
+            case '\n': escaped << "\\n"; break;
+            case '\r': escaped << "\\r"; break;
+            case '\t': escaped << "\\t"; break;
+            default:
+                if (character < 0x20) {
+                    escaped << "\\u" << std::hex << std::setw(4) << std::setfill('0')
+                            << static_cast<int>(character) << std::dec << std::setfill(' ');
+                } else {
+                    escaped << character;
+                }
+        }
+    }
+    return escaped.str();
+}
+
 int main(int argc, char* argv[]) {
-    if (argc != 1 && (argc != 3 || std::string(argv[1]) != "--csv")) {
-        std::cerr << "Usage: telemetry_guard [--csv path]\n";
-        return 3;
+    bool jsonOutput = false;
+    std::string csvPath;
+    for (int index = 1; index < argc; ++index) {
+        const std::string argument = argv[index];
+        if (argument == "--json" && !jsonOutput) {
+            jsonOutput = true;
+        } else if (argument == "--csv" && csvPath.empty() && index + 1 < argc) {
+            csvPath = argv[++index];
+        } else {
+            std::cerr << "Usage: telemetry_guard [--csv path] [--json]\n";
+            return 3;
+        }
     }
     const std::vector<TelemetryReading> sample = {
         {"Altitude", 18250.0, 0.0, 25000.0, -500.0, 27000.0, "m", 0.4, 1.5, 2.0},
@@ -215,12 +247,12 @@ int main(int argc, char* argv[]) {
 
     std::vector<TelemetryReading> readings;
     try {
-        readings = argc == 3 ? readCsv(argv[2]) : sample;
+        readings = csvPath.empty() ? sample : readCsv(csvPath);
     } catch (const std::exception& error) {
         std::cerr << "Input error: " << error.what() << '\n';
         return 3;
     }
-    std::cout << "TelemetryGuard - Vehicle Health Check\n\n";
+    if (!jsonOutput) std::cout << "TelemetryGuard - Vehicle Health Check\n\n";
 
     int nominalCount = 0;
     int warningCount = 0;
@@ -234,15 +266,18 @@ int main(int argc, char* argv[]) {
     int highestPriority = -1;
     std::string priorityChannel = "None";
     TelemetryStatus priorityStatus = TelemetryStatus::Nominal;
+    std::vector<TelemetryStatus> statuses;
 
     for (const auto& reading : readings) {
         const TelemetryStatus status = evaluateReading(reading);
-        std::cout << std::left << std::setw(18) << reading.channel << std::setw(10);
-        if (status == TelemetryStatus::MissingData) std::cout << "N/A";
-        else std::cout << reading.value;
-
-        std::cout << std::setw(8) << reading.unit << std::setw(14) << statusLabel(status)
-                  << "age=" << reading.ageSeconds << "s\n";
+        statuses.push_back(status);
+        if (!jsonOutput) {
+            std::cout << std::left << std::setw(18) << reading.channel << std::setw(10);
+            if (status == TelemetryStatus::MissingData) std::cout << "N/A";
+            else std::cout << reading.value;
+            std::cout << std::setw(8) << reading.unit << std::setw(14) << statusLabel(status)
+                      << "age=" << reading.ageSeconds << "s\n";
+        }
 
         if (status == TelemetryStatus::Nominal) ++nominalCount;
         else if (status == TelemetryStatus::Warning) ++warningCount;
@@ -274,7 +309,39 @@ int main(int argc, char* argv[]) {
         warningCount, criticalCount, agingCount, staleCount, missingDataCount,
         invalidTimestampCount, configurationErrorCount);
 
-    std::cout << "\nNominal readings: " << nominalCount << '\n'
+    if (jsonOutput) {
+        std::cout << "{\"channels\":[";
+        for (std::size_t index = 0; index < readings.size(); ++index) {
+            if (index > 0) std::cout << ',';
+            const auto& reading = readings[index];
+            std::cout << "{\"channel\":\"" << jsonEscape(reading.channel)
+                      << "\",\"value\":";
+            if (std::isfinite(reading.value)) std::cout << reading.value;
+            else std::cout << "null";
+            std::cout << ",\"unit\":\"" << jsonEscape(reading.unit)
+                      << "\",\"age_seconds\":";
+            if (std::isfinite(reading.ageSeconds)) std::cout << reading.ageSeconds;
+            else std::cout << "null";
+            std::cout << ",\"status\":\"" << statusLabel(statuses[index]) << "\"}";
+        }
+        std::cout << "],\"summary\":{\"total_readings\":" << totalReadings
+                  << ",\"nominal\":" << nominalCount
+                  << ",\"warnings\":" << warningCount
+                  << ",\"critical\":" << criticalCount
+                  << ",\"aging\":" << agingCount
+                  << ",\"stale\":" << staleCount
+                  << ",\"missing\":" << missingDataCount
+                  << ",\"invalid_timestamps\":" << invalidTimestampCount
+                  << ",\"configuration_errors\":" << configurationErrorCount
+                  << ",\"blocking_issues\":" << blockingIssueCount
+                  << ",\"priority_channel\":\"" << jsonEscape(priorityChannel)
+                  << "\",\"priority_status\":\"" << statusLabel(priorityStatus)
+                  << "\",\"availability_percent\":" << std::fixed << std::setprecision(1)
+                  << availability << ",\"degradation_percent\":" << degradation
+                  << ",\"health_score\":" << healthScore
+                  << ",\"health_band\":\"" << healthBand(healthScore)
+                  << "\",\"disposition\":\"" << disposition << "\"}}\n";
+    } else std::cout << "\nNominal readings: " << nominalCount << '\n'
               << "Warnings: " << warningCount << '\n'
               << "Critical alerts: " << criticalCount << '\n'
               << "Aging readings: " << agingCount << '\n'
