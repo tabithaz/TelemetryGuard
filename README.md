@@ -73,6 +73,16 @@ Missing or non-finite values are represented as JSON `null`. The command keeps
 the same GO, MONITOR, HOLD, and input-error exit codes, which makes the JSON mode
 usable in CI checks and monitoring pipelines without parsing presentation text.
 
+Choose how health states affect automation with `--fail-on monitor|hold|never`.
+The default, `monitor`, preserves the strict exit codes in the table below.
+`hold` allows MONITOR reports to exit successfully while HOLD still fails, and
+`never` returns success for every valid health report. Input errors always return
+exit code 3 regardless of this policy.
+
+```bash
+./build/telemetry_guard --csv examples/readings.csv --json --fail-on hold
+```
+
 Use `--prometheus` instead of `--json` to emit Prometheus exposition text for
 direct ingestion by monitoring infrastructure:
 

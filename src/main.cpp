@@ -125,6 +125,12 @@ int dispositionExitCode(const std::string& disposition) {
     return 0;
 }
 
+int policyExitCode(const std::string& disposition, const std::string& failOn) {
+    if (failOn == "never") return 0;
+    if (failOn == "hold" && disposition == "MONITOR") return 0;
+    return dispositionExitCode(disposition);
+}
+
 int vehicleHealthScore(int totalReadings, int warningCount, int criticalCount,
                        int agingCount, int staleCount, int missingDataCount,
                        int invalidTimestampCount, int configurationErrorCount) {
@@ -238,6 +244,8 @@ int main(int argc, char* argv[]) {
     bool jsonOutput = false;
     bool prometheusOutput = false;
     std::string csvPath;
+    std::string failOn = "monitor";
+    bool failOnProvided = false;
     for (int index = 1; index < argc; ++index) {
         const std::string argument = argv[index];
         if (argument == "--json" && !jsonOutput) {
@@ -246,13 +254,21 @@ int main(int argc, char* argv[]) {
             prometheusOutput = true;
         } else if (argument == "--csv" && csvPath.empty() && index + 1 < argc) {
             csvPath = argv[++index];
+        } else if (argument == "--fail-on" && !failOnProvided && index + 1 < argc) {
+            failOn = argv[++index];
+            failOnProvided = true;
         } else {
-            std::cerr << "Usage: telemetry_guard [--csv path] [--json | --prometheus]\n";
+            std::cerr << "Usage: telemetry_guard [--csv path] [--json | --prometheus] "
+                         "[--fail-on monitor|hold|never]\n";
             return 3;
         }
     }
     if (jsonOutput && prometheusOutput) {
         std::cerr << "Input error: --json and --prometheus are mutually exclusive\n";
+        return 3;
+    }
+    if (failOn != "monitor" && failOn != "hold" && failOn != "never") {
+        std::cerr << "Input error: --fail-on must be monitor, hold, or never\n";
         return 3;
     }
     const std::vector<TelemetryReading> sample = {
@@ -412,5 +428,5 @@ int main(int argc, char* argv[]) {
               << "Health band: " << healthBand(healthScore) << '\n'
               << "Vehicle disposition: " << disposition << '\n';
 
-    return dispositionExitCode(disposition);
+    return policyExitCode(disposition, failOn);
 }
