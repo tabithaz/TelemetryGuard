@@ -169,16 +169,14 @@ double parseNumber(const std::string& input) {
     return value;
 }
 
-std::vector<TelemetryReading> readCsv(const std::string& path) {
-    std::ifstream file(path);
-    if (!file) throw std::runtime_error("cannot open input file: " + path);
+std::vector<TelemetryReading> readCsv(std::istream& input) {
     const std::string header = "channel,value,warning_min,warning_max,critical_min,critical_max,unit,age_seconds,warning_age_seconds,max_age_seconds";
     std::string line;
-    if (!std::getline(file, line) || line != header) throw std::runtime_error("invalid CSV header");
+    if (!std::getline(input, line) || line != header) throw std::runtime_error("invalid CSV header");
     std::vector<TelemetryReading> readings;
     std::set<std::string> channelNames;
     std::size_t lineNumber = 1;
-    while (std::getline(file, line)) {
+    while (std::getline(input, line)) {
         ++lineNumber;
         try {
             std::vector<std::string> cells;
@@ -201,9 +199,16 @@ std::vector<TelemetryReading> readCsv(const std::string& path) {
             throw std::runtime_error("CSV line " + std::to_string(lineNumber) + ": " + error.what());
         }
     }
-    if (file.bad()) throw std::runtime_error("failed while reading input file");
+    if (input.bad()) throw std::runtime_error("failed while reading CSV input");
     if (readings.empty()) throw std::runtime_error("CSV contains no readings");
     return readings;
+}
+
+std::vector<TelemetryReading> readCsvFile(const std::string& path) {
+    if (path == "-") return readCsv(std::cin);
+    std::ifstream file(path);
+    if (!file) throw std::runtime_error("cannot open input file: " + path);
+    return readCsv(file);
 }
 
 std::string jsonEscape(const std::string& value) {
@@ -263,7 +268,7 @@ int main(int argc, char* argv[]) {
 
     std::vector<TelemetryReading> readings;
     try {
-        readings = csvPath.empty() ? sample : readCsv(csvPath);
+        readings = csvPath.empty() ? sample : readCsvFile(csvPath);
     } catch (const std::exception& error) {
         std::cerr << "Input error: " << error.what() << '\n';
         return 3;

@@ -55,6 +55,13 @@ file returns exit code 3 with a line number; GO, MONITOR, and HOLD still return
 Channel names must be unique and cannot be blank or padded with whitespace;
 invalid input is rejected before any report or metrics are emitted.
 
+Use `--csv -` to read the same format from standard input. This supports direct
+pipeline integration without an intermediate file and works with every output mode:
+
+```bash
+cat examples/readings.csv | ./build/telemetry_guard --csv - --json
+```
+
 Add `--json` to emit machine-readable channel results and the complete health
 summary instead of the formatted report:
 
