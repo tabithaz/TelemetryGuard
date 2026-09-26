@@ -242,6 +242,7 @@ std::string jsonEscape(const std::string& value) {
 
 int main(int argc, char* argv[]) {
     bool jsonOutput = false;
+    bool ndjsonOutput = false;
     bool prometheusOutput = false;
     std::string csvPath;
     std::string failOn = "monitor";
@@ -250,6 +251,8 @@ int main(int argc, char* argv[]) {
         const std::string argument = argv[index];
         if (argument == "--json" && !jsonOutput) {
             jsonOutput = true;
+        } else if (argument == "--ndjson" && !ndjsonOutput) {
+            ndjsonOutput = true;
         } else if (argument == "--prometheus" && !prometheusOutput) {
             prometheusOutput = true;
         } else if (argument == "--csv" && csvPath.empty() && index + 1 < argc) {
@@ -258,13 +261,17 @@ int main(int argc, char* argv[]) {
             failOn = argv[++index];
             failOnProvided = true;
         } else {
-            std::cerr << "Usage: telemetry_guard [--csv path] [--json | --prometheus] "
+            std::cerr << "Usage: telemetry_guard [--csv path] "
+                         "[--json | --ndjson | --prometheus] "
                          "[--fail-on monitor|hold|never]\n";
             return 3;
         }
     }
-    if (jsonOutput && prometheusOutput) {
-        std::cerr << "Input error: --json and --prometheus are mutually exclusive\n";
+    const int outputModes = static_cast<int>(jsonOutput) +
+                            static_cast<int>(ndjsonOutput) +
+                            static_cast<int>(prometheusOutput);
+    if (outputModes > 1) {
+        std::cerr << "Input error: --json, --ndjson, and --prometheus are mutually exclusive\n";
         return 3;
     }
     if (failOn != "monitor" && failOn != "hold" && failOn != "never") {
@@ -289,7 +296,7 @@ int main(int argc, char* argv[]) {
         std::cerr << "Input error: " << error.what() << '\n';
         return 3;
     }
-    if (!jsonOutput && !prometheusOutput)
+    if (!jsonOutput && !ndjsonOutput && !prometheusOutput)
         std::cout << "TelemetryGuard - Vehicle Health Check\n\n";
 
     int nominalCount = 0;
@@ -309,7 +316,7 @@ int main(int argc, char* argv[]) {
     for (const auto& reading : readings) {
         const TelemetryStatus status = evaluateReading(reading);
         statuses.push_back(status);
-        if (!jsonOutput && !prometheusOutput) {
+        if (!jsonOutput && !ndjsonOutput && !prometheusOutput) {
             std::cout << std::left << std::setw(18) << reading.channel << std::setw(10);
             if (status == TelemetryStatus::MissingData) std::cout << "N/A";
             else std::cout << reading.value;
@@ -379,6 +386,36 @@ int main(int argc, char* argv[]) {
                   << ",\"health_score\":" << healthScore
                   << ",\"health_band\":\"" << healthBand(healthScore)
                   << "\",\"disposition\":\"" << disposition << "\"}}\n";
+    } else if (ndjsonOutput) {
+        for (std::size_t index = 0; index < readings.size(); ++index) {
+            const auto& reading = readings[index];
+            std::cout << "{\"type\":\"channel\",\"channel\":\""
+                      << jsonEscape(reading.channel) << "\",\"value\":";
+            if (std::isfinite(reading.value)) std::cout << reading.value;
+            else std::cout << "null";
+            std::cout << ",\"unit\":\"" << jsonEscape(reading.unit)
+                      << "\",\"age_seconds\":";
+            if (std::isfinite(reading.ageSeconds)) std::cout << reading.ageSeconds;
+            else std::cout << "null";
+            std::cout << ",\"status\":\"" << statusLabel(statuses[index]) << "\"}\n";
+        }
+        std::cout << "{\"type\":\"summary\",\"total_readings\":" << totalReadings
+                  << ",\"nominal\":" << nominalCount
+                  << ",\"warnings\":" << warningCount
+                  << ",\"critical\":" << criticalCount
+                  << ",\"aging\":" << agingCount
+                  << ",\"stale\":" << staleCount
+                  << ",\"missing\":" << missingDataCount
+                  << ",\"invalid_timestamps\":" << invalidTimestampCount
+                  << ",\"configuration_errors\":" << configurationErrorCount
+                  << ",\"blocking_issues\":" << blockingIssueCount
+                  << ",\"priority_channel\":\"" << jsonEscape(priorityChannel)
+                  << "\",\"priority_status\":\"" << statusLabel(priorityStatus)
+                  << "\",\"availability_percent\":" << std::fixed << std::setprecision(1)
+                  << availability << ",\"degradation_percent\":" << degradation
+                  << ",\"health_score\":" << healthScore
+                  << ",\"health_band\":\"" << healthBand(healthScore)
+                  << "\",\"disposition\":\"" << disposition << "\"}\n";
     } else if (prometheusOutput) {
         std::cout << "# HELP telemetry_guard_health_score Composite telemetry health score.\n"
                   << "# TYPE telemetry_guard_health_score gauge\n"

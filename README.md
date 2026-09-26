@@ -73,6 +73,14 @@ Missing or non-finite values are represented as JSON `null`. The command keeps
 the same GO, MONITOR, HOLD, and input-error exit codes, which makes the JSON mode
 usable in CI checks and monitoring pipelines without parsing presentation text.
 
+Use `--ndjson` for streaming pipelines and log shippers. It writes one JSON
+record per channel followed by a final summary record, so consumers can process
+results incrementally without buffering the full report:
+
+```bash
+cat examples/readings.csv | ./build/telemetry_guard --csv - --ndjson --fail-on never
+```
+
 Choose how health states affect automation with `--fail-on monitor|hold|never`.
 The default, `monitor`, preserves the strict exit codes in the table below.
 `hold` allows MONITOR reports to exit successfully while HOLD still fails, and

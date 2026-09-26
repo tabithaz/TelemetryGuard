@@ -85,6 +85,10 @@ add_test(NAME json_output COMMAND ${CMAKE_COMMAND}
     -DTELEMETRY_GUARD=$<TARGET_FILE:telemetry_guard>
     -DCSV_FILE=${CMAKE_CURRENT_SOURCE_DIR}/examples/readings.csv
     -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/json_output.cmake)
+add_test(NAME ndjson_output COMMAND ${CMAKE_COMMAND}
+    -DTELEMETRY_GUARD=$<TARGET_FILE:telemetry_guard>
+    -DCSV_FILE=${CMAKE_CURRENT_SOURCE_DIR}/examples/readings.csv
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/ndjson_output.cmake)
 add_test(NAME prometheus_output COMMAND ${CMAKE_COMMAND}
     -DTELEMETRY_GUARD=$<TARGET_FILE:telemetry_guard>
     -DCSV_FILE=${CMAKE_CURRENT_SOURCE_DIR}/examples/readings.csv
