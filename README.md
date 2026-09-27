@@ -49,8 +49,9 @@ cmake --build build --parallel
 Run your own synthetic snapshot with `./build/telemetry_guard --csv examples/readings.csv`.
 The CSV header must match the example exactly. Each row has a channel name, reading,
 warning bounds, critical bounds, unit, age, warning age, and maximum age. Use `NA`
-for a missing reading. Fields are unquoted and cannot contain commas. A malformed
-file returns exit code 3 with a line number; GO, MONITOR, and HOLD still return
+for a missing reading. Fields may use standard CSV double-quote escaping, so channel
+names and units can contain commas and literal quotes. A malformed or unterminated quoted
+field returns exit code 3 with a line number; GO, MONITOR, and HOLD still return
 0, 1, and 2 respectively.
 Channel names must be unique and cannot be blank or padded with whitespace;
 invalid input is rejected before any report or metrics are emitted.

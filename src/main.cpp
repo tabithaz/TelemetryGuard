@@ -175,20 +175,63 @@ double parseNumber(const std::string& input) {
     return value;
 }
 
+std::vector<std::string> parseCsvRow(const std::string& line) {
+    std::vector<std::string> cells;
+    std::string cell;
+    bool insideQuotes = false;
+    bool quotedFieldClosed = false;
+
+    for (std::size_t index = 0; index < line.size(); ++index) {
+        const char character = line[index];
+        if (insideQuotes) {
+            if (character == '"') {
+                if (index + 1 < line.size() && line[index + 1] == '"') {
+                    cell.push_back('"');
+                    ++index;
+                } else {
+                    insideQuotes = false;
+                    quotedFieldClosed = true;
+                }
+            } else {
+                cell.push_back(character);
+            }
+        } else if (quotedFieldClosed) {
+            if (character != ',')
+                throw std::invalid_argument("unexpected character after quoted field");
+            cells.push_back(cell);
+            cell.clear();
+            quotedFieldClosed = false;
+        } else if (character == ',') {
+            cells.push_back(cell);
+            cell.clear();
+        } else if (character == '"') {
+            if (!cell.empty())
+                throw std::invalid_argument("unexpected quote in unquoted field");
+            insideQuotes = true;
+        } else {
+            cell.push_back(character);
+        }
+    }
+
+    if (insideQuotes) throw std::invalid_argument("unterminated quoted field");
+    cells.push_back(cell);
+    return cells;
+}
+
 std::vector<TelemetryReading> readCsv(std::istream& input) {
     const std::string header = "channel,value,warning_min,warning_max,critical_min,critical_max,unit,age_seconds,warning_age_seconds,max_age_seconds";
     std::string line;
-    if (!std::getline(input, line) || line != header) throw std::runtime_error("invalid CSV header");
+    if (!std::getline(input, line)) throw std::runtime_error("invalid CSV header");
+    if (!line.empty() && line.back() == '\r') line.pop_back();
+    if (line != header) throw std::runtime_error("invalid CSV header");
     std::vector<TelemetryReading> readings;
     std::set<std::string> channelNames;
     std::size_t lineNumber = 1;
     while (std::getline(input, line)) {
         ++lineNumber;
         try {
-            std::vector<std::string> cells;
-            std::istringstream row(line);
-            std::string cell;
-            while (std::getline(row, cell, ',')) cells.push_back(cell);
+            if (!line.empty() && line.back() == '\r') line.pop_back();
+            const std::vector<std::string> cells = parseCsvRow(line);
             if (cells.size() != 10 || cells[0].empty() || cells[6].empty())
                 throw std::invalid_argument("expected ten nonempty fields");
             if (cells[0].find_first_not_of(" \t") == std::string::npos)
