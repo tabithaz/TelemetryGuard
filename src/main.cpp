@@ -7,9 +7,12 @@
 #include <iostream>
 #include <limits>
 #include <map>
+#include <optional>
 #include <set>
 #include <string>
 #include <vector>
+
+#include "limit_margin.hpp"
 
 struct TelemetryReading {
     std::string channel;
@@ -174,6 +177,19 @@ double parseNumber(const std::string& input) {
     const double value = std::stod(input, &consumed);
     if (consumed != input.size()) throw std::invalid_argument("invalid number");
     return value;
+}
+
+std::optional<LimitMargin> readingLimitMargin(const TelemetryReading& reading) {
+    try {
+        return calculateLimitMargin(
+            reading.value,
+            reading.warningMinimum,
+            reading.warningMaximum,
+            reading.criticalMinimum,
+            reading.criticalMaximum);
+    } catch (const std::invalid_argument&) {
+        return std::nullopt;
+    }
 }
 
 std::vector<std::string> parseCsvRow(const std::string& line) {
@@ -375,13 +391,24 @@ int main(int argc, char* argv[]) {
     int regressionCount = 0;
     int recoveryCount = 0;
     int unchangedCount = 0;
+    int marginChannelCount = 0;
+    std::optional<double> minimumWarningHeadroom;
     std::string priorityChannel = "None";
     TelemetryStatus priorityStatus = TelemetryStatus::Nominal;
     std::vector<TelemetryStatus> statuses;
+    std::vector<std::optional<LimitMargin>> margins;
 
     for (const auto& reading : readings) {
         const TelemetryStatus status = evaluateReading(reading);
         statuses.push_back(status);
+        const std::optional<LimitMargin> margin = readingLimitMargin(reading);
+        margins.push_back(margin);
+        if (margin.has_value()) {
+            ++marginChannelCount;
+            if (!minimumWarningHeadroom.has_value() ||
+                margin->warningHeadroomPercent < *minimumWarningHeadroom)
+                minimumWarningHeadroom = margin->warningHeadroomPercent;
+        }
         if (!baselineStatuses.empty()) {
             const TelemetryStatus previousStatus = baselineStatuses.at(reading.channel);
             if (statusPriority(status) > statusPriority(previousStatus)) ++regressionCount;
@@ -396,6 +423,9 @@ int main(int argc, char* argv[]) {
                       << "age=" << reading.ageSeconds << "s";
             if (!baselineStatuses.empty())
                 std::cout << " previous=" << statusLabel(baselineStatuses.at(reading.channel));
+            if (margin.has_value())
+                std::cout << " warning_margin=" << margin->nearestWarningMargin
+                          << reading.unit;
             std::cout << '\n';
         }
 
@@ -446,6 +476,18 @@ int main(int argc, char* argv[]) {
             if (!baselineStatuses.empty())
                 std::cout << ",\"previous_status\":\""
                           << statusLabel(baselineStatuses.at(reading.channel)) << "\"";
+            std::cout << ",\"nearest_warning_margin\":";
+            if (margins[index].has_value())
+                std::cout << margins[index]->nearestWarningMargin;
+            else std::cout << "null";
+            std::cout << ",\"nearest_critical_margin\":";
+            if (margins[index].has_value())
+                std::cout << margins[index]->nearestCriticalMargin;
+            else std::cout << "null";
+            std::cout << ",\"warning_headroom_percent\":";
+            if (margins[index].has_value())
+                std::cout << margins[index]->warningHeadroomPercent;
+            else std::cout << "null";
             std::cout << '}';
         }
         std::cout << "],\"summary\":{\"total_readings\":" << totalReadings
@@ -469,7 +511,11 @@ int main(int argc, char* argv[]) {
                   << ",\"regressions\":" << regressionCount
                   << ",\"recoveries\":" << recoveryCount
                   << ",\"unchanged\":" << unchangedCount
-                  << ",\"disposition\":\"" << disposition << "\"}}\n";
+                  << ",\"margin_channels\":" << marginChannelCount
+                  << ",\"minimum_warning_headroom_percent\":";
+        if (minimumWarningHeadroom.has_value()) std::cout << *minimumWarningHeadroom;
+        else std::cout << "null";
+        std::cout << ",\"disposition\":\"" << disposition << "\"}}\n";
     } else if (ndjsonOutput) {
         for (std::size_t index = 0; index < readings.size(); ++index) {
             const auto& reading = readings[index];
@@ -485,6 +531,18 @@ int main(int argc, char* argv[]) {
             if (!baselineStatuses.empty())
                 std::cout << ",\"previous_status\":\""
                           << statusLabel(baselineStatuses.at(reading.channel)) << "\"";
+            std::cout << ",\"nearest_warning_margin\":";
+            if (margins[index].has_value())
+                std::cout << margins[index]->nearestWarningMargin;
+            else std::cout << "null";
+            std::cout << ",\"nearest_critical_margin\":";
+            if (margins[index].has_value())
+                std::cout << margins[index]->nearestCriticalMargin;
+            else std::cout << "null";
+            std::cout << ",\"warning_headroom_percent\":";
+            if (margins[index].has_value())
+                std::cout << margins[index]->warningHeadroomPercent;
+            else std::cout << "null";
             std::cout << "}\n";
         }
         std::cout << "{\"type\":\"summary\",\"total_readings\":" << totalReadings
@@ -508,7 +566,11 @@ int main(int argc, char* argv[]) {
                   << ",\"regressions\":" << regressionCount
                   << ",\"recoveries\":" << recoveryCount
                   << ",\"unchanged\":" << unchangedCount
-                  << ",\"disposition\":\"" << disposition << "\"}\n";
+                  << ",\"margin_channels\":" << marginChannelCount
+                  << ",\"minimum_warning_headroom_percent\":";
+        if (minimumWarningHeadroom.has_value()) std::cout << *minimumWarningHeadroom;
+        else std::cout << "null";
+        std::cout << ",\"disposition\":\"" << disposition << "\"}\n";
     } else if (prometheusOutput) {
         std::cout << "# HELP telemetry_guard_health_score Composite telemetry health score.\n"
                   << "# TYPE telemetry_guard_health_score gauge\n"
@@ -540,6 +602,14 @@ int main(int argc, char* argv[]) {
         std::cout << "# HELP telemetry_guard_blocking_issues Number of HOLD-triggering channels.\n"
                   << "# TYPE telemetry_guard_blocking_issues gauge\n"
                   << "telemetry_guard_blocking_issues " << blockingIssueCount << '\n';
+        std::cout << "# HELP telemetry_guard_margin_channels Channels with valid limit margins.\n"
+                  << "# TYPE telemetry_guard_margin_channels gauge\n"
+                  << "telemetry_guard_margin_channels " << marginChannelCount << '\n';
+        if (minimumWarningHeadroom.has_value())
+            std::cout << "# HELP telemetry_guard_min_warning_headroom_percent Minimum warning-limit headroom.\n"
+                      << "# TYPE telemetry_guard_min_warning_headroom_percent gauge\n"
+                      << "telemetry_guard_min_warning_headroom_percent "
+                      << *minimumWarningHeadroom << '\n';
         if (!baselineStatuses.empty()) {
             std::cout << "# HELP telemetry_guard_transitions Number of channel status transitions.\n"
                       << "# TYPE telemetry_guard_transitions gauge\n"
@@ -567,6 +637,14 @@ int main(int argc, char* argv[]) {
               << "Vehicle health score: " << healthScore << "/100\n"
               << "Health band: " << healthBand(healthScore) << '\n'
               << "Vehicle disposition: " << disposition << '\n';
+
+    if (!jsonOutput && !ndjsonOutput && !prometheusOutput) {
+        std::cout << "Channels with limit margins: " << marginChannelCount << '\n'
+                  << "Minimum warning headroom: ";
+        if (minimumWarningHeadroom.has_value())
+            std::cout << *minimumWarningHeadroom << "%\n";
+        else std::cout << "N/A\n";
+    }
 
     if (!jsonOutput && !ndjsonOutput && !prometheusOutput && !baselineStatuses.empty())
         std::cout << "Status regressions: " << regressionCount << '\n'

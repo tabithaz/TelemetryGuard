@@ -80,6 +80,10 @@ add_test(NAME quoted_csv_fields COMMAND ${CMAKE_COMMAND}
 add_test(NAME baseline_comparison COMMAND ${CMAKE_COMMAND}
     -DTELEMETRY_GUARD=$<TARGET_FILE:telemetry_guard>
     -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/baseline_comparison.cmake)
+add_test(NAME integrated_limit_margins COMMAND ${CMAKE_COMMAND}
+    -DTELEMETRY_GUARD=$<TARGET_FILE:telemetry_guard>
+    -DCSV_FILE=${CMAKE_CURRENT_SOURCE_DIR}/examples/readings.csv
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/integrated_limit_margins.cmake)
 add_test(NAME stdin_playback COMMAND ${CMAKE_COMMAND}
     -DTELEMETRY_GUARD=$<TARGET_FILE:telemetry_guard>
     -DCSV_FILE=${CMAKE_CURRENT_SOURCE_DIR}/examples/readings.csv

@@ -11,6 +11,7 @@ All scenarios are synthetic and contain no operational data.
 - GO, MONITOR, and HOLD vehicle dispositions with script-friendly exit codes
 - Baseline comparisons that identify channel status regressions and recoveries
 - Health score, availability, degradation, and priority-channel reporting
+- Per-channel limit margins and portfolio-level minimum warning headroom
 - Small header-only diagnostic components with focused regression tests
 - Portable CMake builds and CI across GCC, Clang, and Apple Clang
 - AddressSanitizer and UndefinedBehaviorSanitizer validation in CI
@@ -109,7 +110,8 @@ direct ingestion by monitoring infrastructure:
 ```
 
 The metrics include health score, availability, degradation, per-status channel
-counts, blocking issues, and a one-hot GO/MONITOR/HOLD disposition. This mode
+counts, blocking issues, minimum warning-limit headroom, and a one-hot
+GO/MONITOR/HOLD disposition. This mode
 keeps the same disposition exit codes and can feed Prometheus alerts or Grafana
 dashboards without parsing the human-readable report.
 
@@ -160,7 +162,7 @@ The suite covers the end-to-end synthetic health check plus every reusable diagn
 
 ## Design notes
 
-The command-line application assigns the most severe applicable state to each channel. Configuration errors and unavailable data are checked before normal limit evaluation so an invalid reading cannot be mistaken for nominal telemetry. The summary then aggregates those states into availability, degradation, health score, priority channel, and final disposition.
+The command-line application assigns the most severe applicable state to each channel. Configuration errors and unavailable data are checked before normal limit evaluation so an invalid reading cannot be mistaken for nominal telemetry. For finite readings with valid limits, it also runs the reusable limit-margin diagnostic and reports distance to the nearest warning and critical boundary plus normalized warning headroom. The summary then aggregates those states into availability, degradation, health score, minimum headroom, priority channel, and final disposition.
 
 The reusable analyzers are intentionally small and dependency-free. This keeps them easy to test in isolation and makes their behavior explicit enough for systems-oriented code review.
 
