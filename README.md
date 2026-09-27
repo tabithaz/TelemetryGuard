@@ -9,6 +9,7 @@ All scenarios are synthetic and contain no operational data.
 - Defensive validation of telemetry values, timestamps, and channel configuration
 - Warning and critical limit evaluation with freshness-aware status classification
 - GO, MONITOR, and HOLD vehicle dispositions with script-friendly exit codes
+- Baseline comparisons that identify channel status regressions and recoveries
 - Health score, availability, degradation, and priority-channel reporting
 - Small header-only diagnostic components with focused regression tests
 - Portable CMake builds and CI across GCC, Clang, and Apple Clang
@@ -55,6 +56,14 @@ field returns exit code 3 with a line number; GO, MONITOR, and HOLD still return
 0, 1, and 2 respectively.
 Channel names must be unique and cannot be blank or padded with whitespace;
 invalid input is rejected before any report or metrics are emitted.
+
+Compare a current telemetry snapshot with a previous snapshot using `--baseline`.
+Both files must contain the same channel identities. Human, JSON, NDJSON, and
+Prometheus outputs report regressions, recoveries, and unchanged channels:
+
+```bash
+./build/telemetry_guard --csv current.csv --baseline previous.csv --json --fail-on never
+```
 
 Use `--csv -` to read the same format from standard input. This supports direct
 pipeline integration without an intermediate file and works with every output mode:

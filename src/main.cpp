@@ -6,6 +6,7 @@
 #include <stdexcept>
 #include <iostream>
 #include <limits>
+#include <map>
 #include <set>
 #include <string>
 #include <vector>
@@ -288,6 +289,7 @@ int main(int argc, char* argv[]) {
     bool ndjsonOutput = false;
     bool prometheusOutput = false;
     std::string csvPath;
+    std::string baselinePath;
     std::string failOn = "monitor";
     bool failOnProvided = false;
     for (int index = 1; index < argc; ++index) {
@@ -300,11 +302,13 @@ int main(int argc, char* argv[]) {
             prometheusOutput = true;
         } else if (argument == "--csv" && csvPath.empty() && index + 1 < argc) {
             csvPath = argv[++index];
+        } else if (argument == "--baseline" && baselinePath.empty() && index + 1 < argc) {
+            baselinePath = argv[++index];
         } else if (argument == "--fail-on" && !failOnProvided && index + 1 < argc) {
             failOn = argv[++index];
             failOnProvided = true;
         } else {
-            std::cerr << "Usage: telemetry_guard [--csv path] "
+            std::cerr << "Usage: telemetry_guard [--csv path] [--baseline path] "
                          "[--json | --ndjson | --prometheus] "
                          "[--fail-on monitor|hold|never]\n";
             return 3;
@@ -321,6 +325,10 @@ int main(int argc, char* argv[]) {
         std::cerr << "Input error: --fail-on must be monitor, hold, or never\n";
         return 3;
     }
+    if (csvPath == "-" && baselinePath == "-") {
+        std::cerr << "Input error: current and baseline CSV cannot both use standard input\n";
+        return 3;
+    }
     const std::vector<TelemetryReading> sample = {
         {"Altitude", 18250.0, 0.0, 25000.0, -500.0, 27000.0, "m", 0.4, 1.5, 2.0},
         {"Velocity", 1240.0, 0.0, 1800.0, -100.0, 2000.0, "m/s", 0.7, 1.5, 2.0},
@@ -333,8 +341,20 @@ int main(int argc, char* argv[]) {
     };
 
     std::vector<TelemetryReading> readings;
+    std::map<std::string, TelemetryStatus> baselineStatuses;
     try {
         readings = csvPath.empty() ? sample : readCsvFile(csvPath);
+        if (!baselinePath.empty()) {
+            const std::vector<TelemetryReading> baseline = readCsvFile(baselinePath);
+            for (const auto& reading : baseline)
+                baselineStatuses.emplace(reading.channel, evaluateReading(reading));
+            if (baselineStatuses.size() != readings.size())
+                throw std::runtime_error("baseline channels do not match current channels");
+            for (const auto& reading : readings) {
+                if (baselineStatuses.find(reading.channel) == baselineStatuses.end())
+                    throw std::runtime_error("baseline channels do not match current channels");
+            }
+        }
     } catch (const std::exception& error) {
         std::cerr << "Input error: " << error.what() << '\n';
         return 3;
@@ -352,6 +372,9 @@ int main(int argc, char* argv[]) {
     int configurationErrorCount = 0;
     int blockingIssueCount = 0;
     int highestPriority = -1;
+    int regressionCount = 0;
+    int recoveryCount = 0;
+    int unchangedCount = 0;
     std::string priorityChannel = "None";
     TelemetryStatus priorityStatus = TelemetryStatus::Nominal;
     std::vector<TelemetryStatus> statuses;
@@ -359,12 +382,21 @@ int main(int argc, char* argv[]) {
     for (const auto& reading : readings) {
         const TelemetryStatus status = evaluateReading(reading);
         statuses.push_back(status);
+        if (!baselineStatuses.empty()) {
+            const TelemetryStatus previousStatus = baselineStatuses.at(reading.channel);
+            if (statusPriority(status) > statusPriority(previousStatus)) ++regressionCount;
+            else if (statusPriority(status) < statusPriority(previousStatus)) ++recoveryCount;
+            else ++unchangedCount;
+        }
         if (!jsonOutput && !ndjsonOutput && !prometheusOutput) {
             std::cout << std::left << std::setw(18) << reading.channel << std::setw(10);
             if (status == TelemetryStatus::MissingData) std::cout << "N/A";
             else std::cout << reading.value;
             std::cout << std::setw(8) << reading.unit << std::setw(14) << statusLabel(status)
-                      << "age=" << reading.ageSeconds << "s\n";
+                      << "age=" << reading.ageSeconds << "s";
+            if (!baselineStatuses.empty())
+                std::cout << " previous=" << statusLabel(baselineStatuses.at(reading.channel));
+            std::cout << '\n';
         }
 
         if (status == TelemetryStatus::Nominal) ++nominalCount;
@@ -410,7 +442,11 @@ int main(int argc, char* argv[]) {
                       << "\",\"age_seconds\":";
             if (std::isfinite(reading.ageSeconds)) std::cout << reading.ageSeconds;
             else std::cout << "null";
-            std::cout << ",\"status\":\"" << statusLabel(statuses[index]) << "\"}";
+            std::cout << ",\"status\":\"" << statusLabel(statuses[index]) << "\"";
+            if (!baselineStatuses.empty())
+                std::cout << ",\"previous_status\":\""
+                          << statusLabel(baselineStatuses.at(reading.channel)) << "\"";
+            std::cout << '}';
         }
         std::cout << "],\"summary\":{\"total_readings\":" << totalReadings
                   << ",\"nominal\":" << nominalCount
@@ -428,7 +464,12 @@ int main(int argc, char* argv[]) {
                   << availability << ",\"degradation_percent\":" << degradation
                   << ",\"health_score\":" << healthScore
                   << ",\"health_band\":\"" << healthBand(healthScore)
-                  << "\",\"disposition\":\"" << disposition << "\"}}\n";
+                  << "\",\"comparison_enabled\":"
+                  << (baselineStatuses.empty() ? "false" : "true")
+                  << ",\"regressions\":" << regressionCount
+                  << ",\"recoveries\":" << recoveryCount
+                  << ",\"unchanged\":" << unchangedCount
+                  << ",\"disposition\":\"" << disposition << "\"}}\n";
     } else if (ndjsonOutput) {
         for (std::size_t index = 0; index < readings.size(); ++index) {
             const auto& reading = readings[index];
@@ -440,7 +481,11 @@ int main(int argc, char* argv[]) {
                       << "\",\"age_seconds\":";
             if (std::isfinite(reading.ageSeconds)) std::cout << reading.ageSeconds;
             else std::cout << "null";
-            std::cout << ",\"status\":\"" << statusLabel(statuses[index]) << "\"}\n";
+            std::cout << ",\"status\":\"" << statusLabel(statuses[index]) << "\"";
+            if (!baselineStatuses.empty())
+                std::cout << ",\"previous_status\":\""
+                          << statusLabel(baselineStatuses.at(reading.channel)) << "\"";
+            std::cout << "}\n";
         }
         std::cout << "{\"type\":\"summary\",\"total_readings\":" << totalReadings
                   << ",\"nominal\":" << nominalCount
@@ -458,7 +503,12 @@ int main(int argc, char* argv[]) {
                   << availability << ",\"degradation_percent\":" << degradation
                   << ",\"health_score\":" << healthScore
                   << ",\"health_band\":\"" << healthBand(healthScore)
-                  << "\",\"disposition\":\"" << disposition << "\"}\n";
+                  << "\",\"comparison_enabled\":"
+                  << (baselineStatuses.empty() ? "false" : "true")
+                  << ",\"regressions\":" << regressionCount
+                  << ",\"recoveries\":" << recoveryCount
+                  << ",\"unchanged\":" << unchangedCount
+                  << ",\"disposition\":\"" << disposition << "\"}\n";
     } else if (prometheusOutput) {
         std::cout << "# HELP telemetry_guard_health_score Composite telemetry health score.\n"
                   << "# TYPE telemetry_guard_health_score gauge\n"
@@ -490,6 +540,16 @@ int main(int argc, char* argv[]) {
         std::cout << "# HELP telemetry_guard_blocking_issues Number of HOLD-triggering channels.\n"
                   << "# TYPE telemetry_guard_blocking_issues gauge\n"
                   << "telemetry_guard_blocking_issues " << blockingIssueCount << '\n';
+        if (!baselineStatuses.empty()) {
+            std::cout << "# HELP telemetry_guard_transitions Number of channel status transitions.\n"
+                      << "# TYPE telemetry_guard_transitions gauge\n"
+                      << "telemetry_guard_transitions{transition=\"regression\"} "
+                      << regressionCount << '\n'
+                      << "telemetry_guard_transitions{transition=\"recovery\"} "
+                      << recoveryCount << '\n'
+                      << "telemetry_guard_transitions{transition=\"unchanged\"} "
+                      << unchangedCount << '\n';
+        }
     } else std::cout << "\nNominal readings: " << nominalCount << '\n'
               << "Warnings: " << warningCount << '\n'
               << "Critical alerts: " << criticalCount << '\n'
@@ -507,6 +567,11 @@ int main(int argc, char* argv[]) {
               << "Vehicle health score: " << healthScore << "/100\n"
               << "Health band: " << healthBand(healthScore) << '\n'
               << "Vehicle disposition: " << disposition << '\n';
+
+    if (!jsonOutput && !ndjsonOutput && !prometheusOutput && !baselineStatuses.empty())
+        std::cout << "Status regressions: " << regressionCount << '\n'
+                  << "Status recoveries: " << recoveryCount << '\n'
+                  << "Unchanged channels: " << unchangedCount << '\n';
 
     return policyExitCode(disposition, failOn);
 }
