@@ -10,6 +10,7 @@ All scenarios are synthetic and contain no operational data.
 - Warning and critical limit evaluation with freshness-aware status classification
 - GO, MONITOR, and HOLD vehicle dispositions with script-friendly exit codes
 - Baseline comparisons that identify channel status regressions and recoveries
+- Structured transition-event streams for alerting and incident pipelines
 - Health score, availability, degradation, and priority-channel reporting
 - Per-channel limit margins and portfolio-level minimum warning headroom
 - Small header-only diagnostic components with focused regression tests
@@ -64,6 +65,15 @@ Prometheus outputs report regressions, recoveries, and unchanged channels:
 
 ```bash
 ./build/telemetry_guard --csv current.csv --baseline previous.csv --json --fail-on never
+```
+
+Use `--events` with a baseline to emit only actionable status changes as
+newline-delimited JSON. Unchanged channels are suppressed, each transition
+records its direction and previous/current state, and a final summary reports
+the regression and recovery totals:
+
+```bash
+./build/telemetry_guard --csv current.csv --baseline previous.csv --events --fail-on never
 ```
 
 Use `--csv -` to read the same format from standard input. This supports direct

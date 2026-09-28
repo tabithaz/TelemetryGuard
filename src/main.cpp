@@ -304,6 +304,7 @@ int main(int argc, char* argv[]) {
     bool jsonOutput = false;
     bool ndjsonOutput = false;
     bool prometheusOutput = false;
+    bool eventsOutput = false;
     std::string csvPath;
     std::string baselinePath;
     std::string failOn = "monitor";
@@ -316,6 +317,8 @@ int main(int argc, char* argv[]) {
             ndjsonOutput = true;
         } else if (argument == "--prometheus" && !prometheusOutput) {
             prometheusOutput = true;
+        } else if (argument == "--events" && !eventsOutput) {
+            eventsOutput = true;
         } else if (argument == "--csv" && csvPath.empty() && index + 1 < argc) {
             csvPath = argv[++index];
         } else if (argument == "--baseline" && baselinePath.empty() && index + 1 < argc) {
@@ -325,16 +328,17 @@ int main(int argc, char* argv[]) {
             failOnProvided = true;
         } else {
             std::cerr << "Usage: telemetry_guard [--csv path] [--baseline path] "
-                         "[--json | --ndjson | --prometheus] "
+                         "[--json | --ndjson | --prometheus | --events] "
                          "[--fail-on monitor|hold|never]\n";
             return 3;
         }
     }
     const int outputModes = static_cast<int>(jsonOutput) +
                             static_cast<int>(ndjsonOutput) +
-                            static_cast<int>(prometheusOutput);
+                            static_cast<int>(prometheusOutput) +
+                            static_cast<int>(eventsOutput);
     if (outputModes > 1) {
-        std::cerr << "Input error: --json, --ndjson, and --prometheus are mutually exclusive\n";
+        std::cerr << "Input error: output modes are mutually exclusive\n";
         return 3;
     }
     if (failOn != "monitor" && failOn != "hold" && failOn != "never") {
@@ -345,6 +349,12 @@ int main(int argc, char* argv[]) {
         std::cerr << "Input error: current and baseline CSV cannot both use standard input\n";
         return 3;
     }
+    if (eventsOutput && baselinePath.empty()) {
+        std::cerr << "Input error: --events requires --baseline\n";
+        return 3;
+    }
+    const bool structuredOutput = jsonOutput || ndjsonOutput ||
+                                  prometheusOutput || eventsOutput;
     const std::vector<TelemetryReading> sample = {
         {"Altitude", 18250.0, 0.0, 25000.0, -500.0, 27000.0, "m", 0.4, 1.5, 2.0},
         {"Velocity", 1240.0, 0.0, 1800.0, -100.0, 2000.0, "m/s", 0.7, 1.5, 2.0},
@@ -375,7 +385,7 @@ int main(int argc, char* argv[]) {
         std::cerr << "Input error: " << error.what() << '\n';
         return 3;
     }
-    if (!jsonOutput && !ndjsonOutput && !prometheusOutput)
+    if (!structuredOutput)
         std::cout << "TelemetryGuard - Vehicle Health Check\n\n";
 
     int nominalCount = 0;
@@ -415,7 +425,7 @@ int main(int argc, char* argv[]) {
             else if (statusPriority(status) < statusPriority(previousStatus)) ++recoveryCount;
             else ++unchangedCount;
         }
-        if (!jsonOutput && !ndjsonOutput && !prometheusOutput) {
+        if (!structuredOutput) {
             std::cout << std::left << std::setw(18) << reading.channel << std::setw(10);
             if (status == TelemetryStatus::MissingData) std::cout << "N/A";
             else std::cout << reading.value;
@@ -459,7 +469,28 @@ int main(int argc, char* argv[]) {
         warningCount, criticalCount, agingCount, staleCount, missingDataCount,
         invalidTimestampCount, configurationErrorCount);
 
-    if (jsonOutput) {
+    if (eventsOutput) {
+        for (std::size_t index = 0; index < readings.size(); ++index) {
+            const auto& reading = readings[index];
+            const TelemetryStatus previous = baselineStatuses.at(reading.channel);
+            const int currentPriority = statusPriority(statuses[index]);
+            const int previousPriority = statusPriority(previous);
+            if (currentPriority == previousPriority) continue;
+            std::cout << "{\"type\":\"status_transition\",\"transition\":\""
+                      << (currentPriority > previousPriority ? "regression" : "recovery")
+                      << "\",\"channel\":\"" << jsonEscape(reading.channel)
+                      << "\",\"previous_status\":\"" << statusLabel(previous)
+                      << "\",\"current_status\":\"" << statusLabel(statuses[index])
+                      << "\",\"value\":";
+            if (std::isfinite(reading.value)) std::cout << reading.value;
+            else std::cout << "null";
+            std::cout << ",\"unit\":\"" << jsonEscape(reading.unit) << "\"}\n";
+        }
+        std::cout << "{\"type\":\"transition_summary\",\"regressions\":"
+                  << regressionCount << ",\"recoveries\":" << recoveryCount
+                  << ",\"unchanged\":" << unchangedCount
+                  << ",\"disposition\":\"" << disposition << "\"}\n";
+    } else if (jsonOutput) {
         std::cout << "{\"channels\":[";
         for (std::size_t index = 0; index < readings.size(); ++index) {
             if (index > 0) std::cout << ',';
@@ -638,7 +669,7 @@ int main(int argc, char* argv[]) {
               << "Health band: " << healthBand(healthScore) << '\n'
               << "Vehicle disposition: " << disposition << '\n';
 
-    if (!jsonOutput && !ndjsonOutput && !prometheusOutput) {
+    if (!structuredOutput) {
         std::cout << "Channels with limit margins: " << marginChannelCount << '\n'
                   << "Minimum warning headroom: ";
         if (minimumWarningHeadroom.has_value())
@@ -646,7 +677,7 @@ int main(int argc, char* argv[]) {
         else std::cout << "N/A\n";
     }
 
-    if (!jsonOutput && !ndjsonOutput && !prometheusOutput && !baselineStatuses.empty())
+    if (!structuredOutput && !baselineStatuses.empty())
         std::cout << "Status regressions: " << regressionCount << '\n'
                   << "Status recoveries: " << recoveryCount << '\n'
                   << "Unchanged channels: " << unchangedCount << '\n';
