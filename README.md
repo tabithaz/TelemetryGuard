@@ -12,6 +12,7 @@ All scenarios are synthetic and contain no operational data.
 - Baseline comparisons that identify channel status regressions and recoveries
 - Structured transition-event streams for alerting and incident pipelines
 - Health score, availability, degradation, and priority-channel reporting
+- Configurable health-score SLO gates for CI and deployment automation
 - Per-channel limit margins and portfolio-level minimum warning headroom
 - Small header-only diagnostic components with focused regression tests
 - Portable CMake builds and CI across GCC, Clang, and Apple Clang
@@ -113,6 +114,16 @@ exit code 3 regardless of this policy.
 
 ```bash
 ./build/telemetry_guard --csv examples/readings.csv --json --fail-on hold
+```
+
+Enforce a minimum acceptable health score with `--min-health-score 0-100`.
+If the calculated score falls below the threshold, the reported disposition is
+promoted to HOLD and the normal `--fail-on` policy determines the exit code.
+Structured outputs include the configured threshold and whether the gate passed;
+Prometheus output exports both values as gauges:
+
+```bash
+./build/telemetry_guard --csv examples/readings.csv --json --min-health-score 90
 ```
 
 Use `--prometheus` instead of `--json` to emit Prometheus exposition text for

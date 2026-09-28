@@ -94,6 +94,9 @@ add_test(NAME stdin_playback COMMAND ${CMAKE_COMMAND}
 add_test(NAME exit_policy COMMAND ${CMAKE_COMMAND}
     -DTELEMETRY_GUARD=$<TARGET_FILE:telemetry_guard>
     -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/exit_policy.cmake)
+add_test(NAME health_score_gate COMMAND ${CMAKE_COMMAND}
+    -DTELEMETRY_GUARD=$<TARGET_FILE:telemetry_guard>
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/health_score_gate.cmake)
 add_test(NAME json_output COMMAND ${CMAKE_COMMAND}
     -DTELEMETRY_GUARD=$<TARGET_FILE:telemetry_guard>
     -DCSV_FILE=${CMAKE_CURRENT_SOURCE_DIR}/examples/readings.csv

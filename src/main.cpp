@@ -320,6 +320,7 @@ int main(int argc, char* argv[]) {
     std::string baselinePath;
     std::string failOn = "monitor";
     bool failOnProvided = false;
+    std::optional<int> minimumHealthScore;
     for (int index = 1; index < argc; ++index) {
         const std::string argument = argv[index];
         if (argument == "--json" && !jsonOutput) {
@@ -337,10 +338,23 @@ int main(int argc, char* argv[]) {
         } else if (argument == "--fail-on" && !failOnProvided && index + 1 < argc) {
             failOn = argv[++index];
             failOnProvided = true;
+        } else if (argument == "--min-health-score" &&
+                   !minimumHealthScore.has_value() && index + 1 < argc) {
+            const std::string value = argv[++index];
+            try {
+                std::size_t consumed = 0;
+                const int threshold = std::stoi(value, &consumed);
+                if (consumed != value.size() || threshold < 0 || threshold > 100)
+                    throw std::invalid_argument("out of range");
+                minimumHealthScore = threshold;
+            } catch (const std::exception&) {
+                std::cerr << "Input error: --min-health-score must be an integer from 0 to 100\n";
+                return 3;
+            }
         } else {
             std::cerr << "Usage: telemetry_guard [--csv path] [--baseline path] "
                          "[--json | --ndjson | --prometheus | --events] "
-                         "[--fail-on monitor|hold|never]\n";
+                         "[--fail-on monitor|hold|never] [--min-health-score 0-100]\n";
             return 3;
         }
     }
@@ -484,9 +498,14 @@ int main(int argc, char* argv[]) {
         totalReadings, staleCount, missingDataCount, invalidTimestampCount,
         configurationErrorCount);
     const double degradation = telemetryDegradationPercent(totalReadings, nominalCount);
-    const std::string disposition = vehicleDisposition(
+    const std::string channelDisposition = vehicleDisposition(
         warningCount, criticalCount, agingCount, staleCount, missingDataCount,
         invalidTimestampCount, configurationErrorCount);
+    const bool healthScoreGateMet = !minimumHealthScore.has_value() ||
+                                    healthScore >= *minimumHealthScore;
+    const std::string disposition = healthScoreGateMet
+        ? channelDisposition
+        : "HOLD";
 
     if (eventsOutput) {
         for (std::size_t index = 0; index < readings.size(); ++index) {
@@ -508,6 +527,11 @@ int main(int argc, char* argv[]) {
         std::cout << "{\"type\":\"transition_summary\",\"regressions\":"
                   << regressionCount << ",\"recoveries\":" << recoveryCount
                   << ",\"unchanged\":" << unchangedCount
+                  << ",\"minimum_health_score\":";
+        if (minimumHealthScore.has_value()) std::cout << *minimumHealthScore;
+        else std::cout << "null";
+        std::cout << ",\"health_score_gate_met\":"
+                  << (healthScoreGateMet ? "true" : "false")
                   << ",\"disposition\":\"" << disposition << "\"}\n";
     } else if (jsonOutput) {
         std::cout << "{\"channels\":[";
@@ -556,7 +580,12 @@ int main(int argc, char* argv[]) {
                   << availability << ",\"degradation_percent\":" << degradation
                   << ",\"health_score\":" << healthScore
                   << ",\"health_band\":\"" << healthBand(healthScore)
-                  << "\",\"comparison_enabled\":"
+                  << "\",\"minimum_health_score\":";
+        if (minimumHealthScore.has_value()) std::cout << *minimumHealthScore;
+        else std::cout << "null";
+        std::cout << ",\"health_score_gate_met\":"
+                  << (healthScoreGateMet ? "true" : "false")
+                  << ",\"comparison_enabled\":"
                   << (baselineStatuses.empty() ? "false" : "true")
                   << ",\"regressions\":" << regressionCount
                   << ",\"recoveries\":" << recoveryCount
@@ -611,7 +640,12 @@ int main(int argc, char* argv[]) {
                   << availability << ",\"degradation_percent\":" << degradation
                   << ",\"health_score\":" << healthScore
                   << ",\"health_band\":\"" << healthBand(healthScore)
-                  << "\",\"comparison_enabled\":"
+                  << "\",\"minimum_health_score\":";
+        if (minimumHealthScore.has_value()) std::cout << *minimumHealthScore;
+        else std::cout << "null";
+        std::cout << ",\"health_score_gate_met\":"
+                  << (healthScoreGateMet ? "true" : "false")
+                  << ",\"comparison_enabled\":"
                   << (baselineStatuses.empty() ? "false" : "true")
                   << ",\"regressions\":" << regressionCount
                   << ",\"recoveries\":" << recoveryCount
@@ -660,6 +694,15 @@ int main(int argc, char* argv[]) {
                       << "# TYPE telemetry_guard_min_warning_headroom_percent gauge\n"
                       << "telemetry_guard_min_warning_headroom_percent "
                       << *minimumWarningHeadroom << '\n';
+        if (minimumHealthScore.has_value())
+            std::cout << "# HELP telemetry_guard_minimum_health_score Configured health score gate.\n"
+                      << "# TYPE telemetry_guard_minimum_health_score gauge\n"
+                      << "telemetry_guard_minimum_health_score "
+                      << *minimumHealthScore << '\n'
+                      << "# HELP telemetry_guard_health_score_gate_met Whether the health score gate passed.\n"
+                      << "# TYPE telemetry_guard_health_score_gate_met gauge\n"
+                      << "telemetry_guard_health_score_gate_met "
+                      << (healthScoreGateMet ? 1 : 0) << '\n';
         if (!baselineStatuses.empty()) {
             std::cout << "# HELP telemetry_guard_transitions Number of channel status transitions.\n"
                       << "# TYPE telemetry_guard_transitions gauge\n"
@@ -694,6 +737,10 @@ int main(int argc, char* argv[]) {
         if (minimumWarningHeadroom.has_value())
             std::cout << *minimumWarningHeadroom << "%\n";
         else std::cout << "N/A\n";
+        if (minimumHealthScore.has_value())
+            std::cout << "Minimum health score: " << *minimumHealthScore << "\n"
+                      << "Health score gate: "
+                      << (healthScoreGateMet ? "PASS" : "FAIL") << '\n';
     }
 
     if (!structuredOutput && !baselineStatuses.empty())
