@@ -61,7 +61,10 @@ invalid input is rejected before any report or metrics are emitted.
 
 Compare a current telemetry snapshot with a previous snapshot using `--baseline`.
 Both files must contain the same channel identities. Human, JSON, NDJSON, and
-Prometheus outputs report regressions, recoveries, and unchanged channels:
+Prometheus outputs report regressions, recoveries, and unchanged channels.
+Units, warning and critical limits, and freshness thresholds must also match;
+configuration drift is rejected before output so status changes are not
+calculated across incompatible telemetry definitions:
 
 ```bash
 ./build/telemetry_guard --csv current.csv --baseline previous.csv --json --fail-on never

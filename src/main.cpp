@@ -52,6 +52,17 @@ bool hasValidConfiguration(const TelemetryReading& reading) {
            reading.warningAgeSeconds <= reading.maxAgeSeconds;
 }
 
+bool hasMatchingConfiguration(const TelemetryReading& current,
+                              const TelemetryReading& baseline) {
+    return current.unit == baseline.unit &&
+           current.warningMinimum == baseline.warningMinimum &&
+           current.warningMaximum == baseline.warningMaximum &&
+           current.criticalMinimum == baseline.criticalMinimum &&
+           current.criticalMaximum == baseline.criticalMaximum &&
+           current.warningAgeSeconds == baseline.warningAgeSeconds &&
+           current.maxAgeSeconds == baseline.maxAgeSeconds;
+}
+
 TelemetryStatus evaluateReading(const TelemetryReading& reading) {
     if (!hasValidConfiguration(reading)) {
         return TelemetryStatus::InvalidConfiguration;
@@ -372,6 +383,9 @@ int main(int argc, char* argv[]) {
         readings = csvPath.empty() ? sample : readCsvFile(csvPath);
         if (!baselinePath.empty()) {
             const std::vector<TelemetryReading> baseline = readCsvFile(baselinePath);
+            std::map<std::string, TelemetryReading> baselineReadings;
+            for (const auto& reading : baseline)
+                baselineReadings.emplace(reading.channel, reading);
             for (const auto& reading : baseline)
                 baselineStatuses.emplace(reading.channel, evaluateReading(reading));
             if (baselineStatuses.size() != readings.size())
@@ -379,6 +393,11 @@ int main(int argc, char* argv[]) {
             for (const auto& reading : readings) {
                 if (baselineStatuses.find(reading.channel) == baselineStatuses.end())
                     throw std::runtime_error("baseline channels do not match current channels");
+                if (!hasMatchingConfiguration(
+                        reading, baselineReadings.at(reading.channel)))
+                    throw std::runtime_error(
+                        "baseline configuration differs for channel: " +
+                        reading.channel);
             }
         }
     } catch (const std::exception& error) {
