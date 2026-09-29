@@ -98,6 +98,18 @@ pipeline integration without an intermediate file and works with every output mo
 cat examples/readings.csv | ./build/telemetry_guard --csv - --json
 ```
 
+Emit a standard JUnit XML report for CI systems that can publish test results:
+
+```bash
+./build/telemetry_guard --csv examples/readings.csv --junit --fail-on never \
+  > telemetry-health.xml
+```
+
+Each channel becomes a test case, every non-nominal status becomes a failure,
+and suite properties record the health score, health band, availability, and
+final disposition. The existing `--fail-on` policy still controls the process
+exit code independently of the report.
+
 Add `--json` to emit machine-readable channel results and the complete health
 summary instead of the formatted report:
 

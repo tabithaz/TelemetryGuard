@@ -311,11 +311,30 @@ std::string jsonEscape(const std::string& value) {
     return escaped.str();
 }
 
+std::string xmlEscape(const std::string& value) {
+    std::ostringstream escaped;
+    for (const unsigned char character : value) {
+        switch (character) {
+            case '&': escaped << "&amp;"; break;
+            case '<': escaped << "&lt;"; break;
+            case '>': escaped << "&gt;"; break;
+            case '"': escaped << "&quot;"; break;
+            case '\'': escaped << "&apos;"; break;
+            default:
+                if (character == '\t' || character == '\n' || character == '\r' ||
+                    character >= 0x20)
+                    escaped << character;
+        }
+    }
+    return escaped.str();
+}
+
 int main(int argc, char* argv[]) {
     bool jsonOutput = false;
     bool ndjsonOutput = false;
     bool prometheusOutput = false;
     bool eventsOutput = false;
+    bool junitOutput = false;
     std::string csvPath;
     std::string baselinePath;
     std::string failOn = "monitor";
@@ -332,6 +351,8 @@ int main(int argc, char* argv[]) {
             prometheusOutput = true;
         } else if (argument == "--events" && !eventsOutput) {
             eventsOutput = true;
+        } else if (argument == "--junit" && !junitOutput) {
+            junitOutput = true;
         } else if (argument == "--csv" && csvPath.empty() && index + 1 < argc) {
             csvPath = argv[++index];
         } else if (argument == "--baseline" && baselinePath.empty() && index + 1 < argc) {
@@ -369,7 +390,7 @@ int main(int argc, char* argv[]) {
             }
         } else {
             std::cerr << "Usage: telemetry_guard [--csv path] [--baseline path] "
-                         "[--json | --ndjson | --prometheus | --events] "
+                         "[--json | --ndjson | --prometheus | --events | --junit] "
                          "[--fail-on monitor|hold|never] [--min-health-score 0-100] "
                          "[--margin-drop-percent 0-100]\n";
             return 3;
@@ -378,7 +399,8 @@ int main(int argc, char* argv[]) {
     const int outputModes = static_cast<int>(jsonOutput) +
                             static_cast<int>(ndjsonOutput) +
                             static_cast<int>(prometheusOutput) +
-                            static_cast<int>(eventsOutput);
+                            static_cast<int>(eventsOutput) +
+                            static_cast<int>(junitOutput);
     if (outputModes > 1) {
         std::cerr << "Input error: output modes are mutually exclusive\n";
         return 3;
@@ -400,7 +422,7 @@ int main(int argc, char* argv[]) {
         return 3;
     }
     const bool structuredOutput = jsonOutput || ndjsonOutput ||
-                                  prometheusOutput || eventsOutput;
+                                  prometheusOutput || eventsOutput || junitOutput;
     const std::vector<TelemetryReading> sample = {
         {"Altitude", 18250.0, 0.0, 25000.0, -500.0, 27000.0, "m", 0.4, 1.5, 2.0},
         {"Velocity", 1240.0, 0.0, 1800.0, -100.0, 2000.0, "m/s", 0.7, 1.5, 2.0},
@@ -528,7 +550,40 @@ int main(int argc, char* argv[]) {
         ? channelDisposition
         : "HOLD";
 
-    if (eventsOutput) {
+    if (junitOutput) {
+        const int failureCount = totalReadings - nominalCount;
+        std::cout << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+                  << "<testsuite name=\"TelemetryGuard\" tests=\"" << totalReadings
+                  << "\" failures=\"" << failureCount
+                  << "\" errors=\"0\" skipped=\"0\">\n"
+                  << "  <properties>\n"
+                  << "    <property name=\"health_score\" value=\"" << healthScore
+                  << "\"/>\n"
+                  << "    <property name=\"health_band\" value=\""
+                  << xmlEscape(healthBand(healthScore)) << "\"/>\n"
+                  << "    <property name=\"disposition\" value=\""
+                  << xmlEscape(disposition) << "\"/>\n"
+                  << "    <property name=\"availability_percent\" value=\""
+                  << std::fixed << std::setprecision(1) << availability << "\"/>\n"
+                  << "  </properties>\n";
+        for (std::size_t index = 0; index < readings.size(); ++index) {
+            const auto& reading = readings[index];
+            const std::string status = statusLabel(statuses[index]);
+            std::cout << "  <testcase classname=\"TelemetryGuard.Channel\" name=\""
+                      << xmlEscape(reading.channel) << "\" time=\"0\">\n";
+            if (statuses[index] != TelemetryStatus::Nominal) {
+                std::cout << "    <failure type=\"" << xmlEscape(status)
+                          << "\" message=\"Channel status: " << xmlEscape(status)
+                          << "\">value=";
+                if (std::isfinite(reading.value)) std::cout << reading.value;
+                else std::cout << "null";
+                std::cout << " unit=" << xmlEscape(reading.unit)
+                          << " age_seconds=" << reading.ageSeconds << "</failure>\n";
+            }
+            std::cout << "  </testcase>\n";
+        }
+        std::cout << "</testsuite>\n";
+    } else if (eventsOutput) {
         int marginRegressionCount = 0;
         for (std::size_t index = 0; index < readings.size(); ++index) {
             const auto& reading = readings[index];
