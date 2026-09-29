@@ -80,6 +80,17 @@ the regression and recovery totals:
 ./build/telemetry_guard --csv current.csv --baseline previous.csv --events --fail-on never
 ```
 
+Add `--margin-drop-percent` to surface predictive events before a channel's
+status changes. TelemetryGuard compares normalized warning-limit headroom and
+emits a `margin_regression` event when the drop reaches the configured
+percentage-point threshold. Status transitions take precedence, so each
+channel emits at most one event per comparison:
+
+```bash
+./build/telemetry_guard --csv current.csv --baseline previous.csv --events \
+  --margin-drop-percent 25 --fail-on never
+```
+
 Use `--csv -` to read the same format from standard input. This supports direct
 pipeline integration without an intermediate file and works with every output mode:
 

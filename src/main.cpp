@@ -321,6 +321,7 @@ int main(int argc, char* argv[]) {
     std::string failOn = "monitor";
     bool failOnProvided = false;
     std::optional<int> minimumHealthScore;
+    std::optional<double> marginDropPercent;
     for (int index = 1; index < argc; ++index) {
         const std::string argument = argv[index];
         if (argument == "--json" && !jsonOutput) {
@@ -351,10 +352,26 @@ int main(int argc, char* argv[]) {
                 std::cerr << "Input error: --min-health-score must be an integer from 0 to 100\n";
                 return 3;
             }
+        } else if (argument == "--margin-drop-percent" &&
+                   !marginDropPercent.has_value() && index + 1 < argc) {
+            const std::string value = argv[++index];
+            try {
+                std::size_t consumed = 0;
+                const double threshold = std::stod(value, &consumed);
+                if (consumed != value.size() || !std::isfinite(threshold) ||
+                    threshold <= 0.0 || threshold > 100.0)
+                    throw std::invalid_argument("out of range");
+                marginDropPercent = threshold;
+            } catch (const std::exception&) {
+                std::cerr << "Input error: --margin-drop-percent must be a number "
+                             "greater than 0 and at most 100\n";
+                return 3;
+            }
         } else {
             std::cerr << "Usage: telemetry_guard [--csv path] [--baseline path] "
                          "[--json | --ndjson | --prometheus | --events] "
-                         "[--fail-on monitor|hold|never] [--min-health-score 0-100]\n";
+                         "[--fail-on monitor|hold|never] [--min-health-score 0-100] "
+                         "[--margin-drop-percent 0-100]\n";
             return 3;
         }
     }
@@ -378,6 +395,10 @@ int main(int argc, char* argv[]) {
         std::cerr << "Input error: --events requires --baseline\n";
         return 3;
     }
+    if (marginDropPercent.has_value() && !eventsOutput) {
+        std::cerr << "Input error: --margin-drop-percent requires --events\n";
+        return 3;
+    }
     const bool structuredOutput = jsonOutput || ndjsonOutput ||
                                   prometheusOutput || eventsOutput;
     const std::vector<TelemetryReading> sample = {
@@ -393,11 +414,11 @@ int main(int argc, char* argv[]) {
 
     std::vector<TelemetryReading> readings;
     std::map<std::string, TelemetryStatus> baselineStatuses;
+    std::map<std::string, TelemetryReading> baselineReadings;
     try {
         readings = csvPath.empty() ? sample : readCsvFile(csvPath);
         if (!baselinePath.empty()) {
             const std::vector<TelemetryReading> baseline = readCsvFile(baselinePath);
-            std::map<std::string, TelemetryReading> baselineReadings;
             for (const auto& reading : baseline)
                 baselineReadings.emplace(reading.channel, reading);
             for (const auto& reading : baseline)
@@ -508,18 +529,40 @@ int main(int argc, char* argv[]) {
         : "HOLD";
 
     if (eventsOutput) {
+        int marginRegressionCount = 0;
         for (std::size_t index = 0; index < readings.size(); ++index) {
             const auto& reading = readings[index];
             const TelemetryStatus previous = baselineStatuses.at(reading.channel);
             const int currentPriority = statusPriority(statuses[index]);
             const int previousPriority = statusPriority(previous);
-            if (currentPriority == previousPriority) continue;
-            std::cout << "{\"type\":\"status_transition\",\"transition\":\""
-                      << (currentPriority > previousPriority ? "regression" : "recovery")
-                      << "\",\"channel\":\"" << jsonEscape(reading.channel)
-                      << "\",\"previous_status\":\"" << statusLabel(previous)
-                      << "\",\"current_status\":\"" << statusLabel(statuses[index])
-                      << "\",\"value\":";
+            if (currentPriority != previousPriority) {
+                std::cout << "{\"type\":\"status_transition\",\"transition\":\""
+                          << (currentPriority > previousPriority ? "regression" : "recovery")
+                          << "\",\"channel\":\"" << jsonEscape(reading.channel)
+                          << "\",\"previous_status\":\"" << statusLabel(previous)
+                          << "\",\"current_status\":\"" << statusLabel(statuses[index])
+                          << "\",\"value\":";
+                if (std::isfinite(reading.value)) std::cout << reading.value;
+                else std::cout << "null";
+                std::cout << ",\"unit\":\"" << jsonEscape(reading.unit) << "\"}\n";
+                continue;
+            }
+            if (!marginDropPercent.has_value() || !margins[index].has_value()) continue;
+            const auto previousMargin = readingLimitMargin(
+                baselineReadings.at(reading.channel));
+            if (!previousMargin.has_value()) continue;
+            const double drop = previousMargin->warningHeadroomPercent -
+                                margins[index]->warningHeadroomPercent;
+            if (drop < *marginDropPercent) continue;
+            ++marginRegressionCount;
+            std::cout << "{\"type\":\"margin_regression\",\"channel\":\""
+                      << jsonEscape(reading.channel) << "\",\"status\":\""
+                      << statusLabel(statuses[index])
+                      << "\",\"previous_warning_headroom_percent\":"
+                      << previousMargin->warningHeadroomPercent
+                      << ",\"current_warning_headroom_percent\":"
+                      << margins[index]->warningHeadroomPercent
+                      << ",\"drop_percent\":" << drop << ",\"value\":";
             if (std::isfinite(reading.value)) std::cout << reading.value;
             else std::cout << "null";
             std::cout << ",\"unit\":\"" << jsonEscape(reading.unit) << "\"}\n";
@@ -527,6 +570,11 @@ int main(int argc, char* argv[]) {
         std::cout << "{\"type\":\"transition_summary\",\"regressions\":"
                   << regressionCount << ",\"recoveries\":" << recoveryCount
                   << ",\"unchanged\":" << unchangedCount
+                  << ",\"margin_regressions\":" << marginRegressionCount
+                  << ",\"margin_drop_threshold_percent\":";
+        if (marginDropPercent.has_value()) std::cout << *marginDropPercent;
+        else std::cout << "null";
+        std::cout
                   << ",\"minimum_health_score\":";
         if (minimumHealthScore.has_value()) std::cout << *minimumHealthScore;
         else std::cout << "null";
