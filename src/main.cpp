@@ -329,12 +329,26 @@ std::string xmlEscape(const std::string& value) {
     return escaped.str();
 }
 
+std::string githubCommandEscape(const std::string& value, bool property) {
+    std::ostringstream escaped;
+    for (const char character : value) {
+        if (character == '%') escaped << "%25";
+        else if (character == '\r') escaped << "%0D";
+        else if (character == '\n') escaped << "%0A";
+        else if (property && character == ':') escaped << "%3A";
+        else if (property && character == ',') escaped << "%2C";
+        else escaped << character;
+    }
+    return escaped.str();
+}
+
 int main(int argc, char* argv[]) {
     bool jsonOutput = false;
     bool ndjsonOutput = false;
     bool prometheusOutput = false;
     bool eventsOutput = false;
     bool junitOutput = false;
+    bool githubOutput = false;
     std::string csvPath;
     std::string baselinePath;
     std::string failOn = "monitor";
@@ -353,6 +367,8 @@ int main(int argc, char* argv[]) {
             eventsOutput = true;
         } else if (argument == "--junit" && !junitOutput) {
             junitOutput = true;
+        } else if (argument == "--github-annotations" && !githubOutput) {
+            githubOutput = true;
         } else if (argument == "--csv" && csvPath.empty() && index + 1 < argc) {
             csvPath = argv[++index];
         } else if (argument == "--baseline" && baselinePath.empty() && index + 1 < argc) {
@@ -390,7 +406,8 @@ int main(int argc, char* argv[]) {
             }
         } else {
             std::cerr << "Usage: telemetry_guard [--csv path] [--baseline path] "
-                         "[--json | --ndjson | --prometheus | --events | --junit] "
+                         "[--json | --ndjson | --prometheus | --events | --junit | "
+                         "--github-annotations] "
                          "[--fail-on monitor|hold|never] [--min-health-score 0-100] "
                          "[--margin-drop-percent 0-100]\n";
             return 3;
@@ -400,7 +417,8 @@ int main(int argc, char* argv[]) {
                             static_cast<int>(ndjsonOutput) +
                             static_cast<int>(prometheusOutput) +
                             static_cast<int>(eventsOutput) +
-                            static_cast<int>(junitOutput);
+                            static_cast<int>(junitOutput) +
+                            static_cast<int>(githubOutput);
     if (outputModes > 1) {
         std::cerr << "Input error: output modes are mutually exclusive\n";
         return 3;
@@ -422,7 +440,8 @@ int main(int argc, char* argv[]) {
         return 3;
     }
     const bool structuredOutput = jsonOutput || ndjsonOutput ||
-                                  prometheusOutput || eventsOutput || junitOutput;
+                                  prometheusOutput || eventsOutput || junitOutput ||
+                                  githubOutput;
     const std::vector<TelemetryReading> sample = {
         {"Altitude", 18250.0, 0.0, 25000.0, -500.0, 27000.0, "m", 0.4, 1.5, 2.0},
         {"Velocity", 1240.0, 0.0, 1800.0, -100.0, 2000.0, "m/s", 0.7, 1.5, 2.0},
@@ -550,7 +569,26 @@ int main(int argc, char* argv[]) {
         ? channelDisposition
         : "HOLD";
 
-    if (junitOutput) {
+    if (githubOutput) {
+        for (std::size_t index = 0; index < readings.size(); ++index) {
+            if (statuses[index] == TelemetryStatus::Nominal) continue;
+            const auto& reading = readings[index];
+            const char* level = requiresHold(statuses[index]) ? "error" : "warning";
+            const std::string title = "TelemetryGuard: " + reading.channel;
+            std::cout << "::" << level << " title="
+                      << githubCommandEscape(title, true) << "::Channel status "
+                      << statusLabel(statuses[index]) << "; value=";
+            if (std::isfinite(reading.value)) std::cout << reading.value;
+            else std::cout << "null";
+            std::cout << "; unit=" << githubCommandEscape(reading.unit, false)
+                      << "; age_seconds=" << reading.ageSeconds << '\n';
+        }
+        std::ostringstream summary;
+        summary << "Disposition " << disposition << ", health score "
+                << healthScore << "/100, blocking issues " << blockingIssueCount;
+        std::cout << "::notice title=TelemetryGuard summary::"
+                  << githubCommandEscape(summary.str(), false) << '\n';
+    } else if (junitOutput) {
         const int failureCount = totalReadings - nominalCount;
         std::cout << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
                   << "<testsuite name=\"TelemetryGuard\" tests=\"" << totalReadings

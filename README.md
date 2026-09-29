@@ -13,6 +13,7 @@ All scenarios are synthetic and contain no operational data.
 - Structured transition-event streams for alerting and incident pipelines
 - Health score, availability, degradation, and priority-channel reporting
 - Configurable health-score SLO gates for CI and deployment automation
+- Native GitHub Actions warnings and errors for degraded telemetry channels
 - Per-channel limit margins and portfolio-level minimum warning headroom
 - Small header-only diagnostic components with focused regression tests
 - Portable CMake builds and CI across GCC, Clang, and Apple Clang
@@ -109,6 +110,16 @@ Each channel becomes a test case, every non-nominal status becomes a failure,
 and suite properties record the health score, health band, availability, and
 final disposition. The existing `--fail-on` policy still controls the process
 exit code independently of the report.
+
+Use `--github-annotations` in GitHub Actions to surface degraded channels
+directly in the workflow log. Warning and aging states create warning
+annotations, HOLD-triggering states create errors, and a final notice records
+the disposition, health score, and blocking-issue count. Workflow-command
+characters in channel names and units are escaped safely:
+
+```bash
+./build/telemetry_guard --csv examples/readings.csv --github-annotations
+```
 
 Add `--json` to emit machine-readable channel results and the complete health
 summary instead of the formatted report:
