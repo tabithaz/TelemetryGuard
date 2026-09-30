@@ -378,6 +378,7 @@ int main(int argc, char* argv[]) {
     bool sarifOutput = false;
     std::string csvPath;
     std::string baselinePath;
+    std::string outputPath;
     std::string failOn = "monitor";
     bool failOnProvided = false;
     std::optional<int> minimumHealthScore;
@@ -404,6 +405,8 @@ int main(int argc, char* argv[]) {
             csvPath = argv[++index];
         } else if (argument == "--baseline" && baselinePath.empty() && index + 1 < argc) {
             baselinePath = argv[++index];
+        } else if (argument == "--output" && outputPath.empty() && index + 1 < argc) {
+            outputPath = argv[++index];
         } else if (argument == "--fail-on" && !failOnProvided && index + 1 < argc) {
             failOn = argv[++index];
             failOnProvided = true;
@@ -439,6 +442,7 @@ int main(int argc, char* argv[]) {
             std::cerr << "Usage: telemetry_guard [--csv path] [--baseline path] "
                          "[--json | --ndjson | --prometheus | --events | --junit | "
                          "--github-annotations | --html | --sarif] "
+                         "[--output path] "
                          "[--fail-on monitor|hold|never] [--min-health-score 0-100] "
                          "[--margin-drop-percent 0-100]\n";
             return 3;
@@ -512,6 +516,17 @@ int main(int argc, char* argv[]) {
     } catch (const std::exception& error) {
         std::cerr << "Input error: " << error.what() << '\n';
         return 3;
+    }
+
+    std::ofstream outputFile;
+    std::streambuf* standardOutput = nullptr;
+    if (!outputPath.empty()) {
+        outputFile.open(outputPath, std::ios::out | std::ios::trunc);
+        if (!outputFile) {
+            std::cerr << "Output error: cannot open file: " << outputPath << '\n';
+            return 3;
+        }
+        standardOutput = std::cout.rdbuf(outputFile.rdbuf());
     }
     if (!structuredOutput)
         std::cout << "TelemetryGuard - Vehicle Health Check\n\n";
@@ -1024,5 +1039,16 @@ int main(int argc, char* argv[]) {
                   << "Status recoveries: " << recoveryCount << '\n'
                   << "Unchanged channels: " << unchangedCount << '\n';
 
-    return policyExitCode(disposition, failOn);
+    const int exitCode = policyExitCode(disposition, failOn);
+    if (standardOutput != nullptr) {
+        std::cout.flush();
+        const bool writeFailed = !outputFile;
+        std::cout.rdbuf(standardOutput);
+        outputFile.close();
+        if (writeFailed || !outputFile) {
+            std::cerr << "Output error: cannot write file: " << outputPath << '\n';
+            return 3;
+        }
+    }
+    return exitCode;
 }

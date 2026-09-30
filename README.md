@@ -165,6 +165,15 @@ results incrementally without buffering the full report:
 cat examples/readings.csv | ./build/telemetry_guard --csv - --ndjson --fail-on never
 ```
 
+Write any report mode directly to an artifact with `--output`. The report is
+kept off standard output, input failures do not replace the destination, and
+the process still returns the configured GO, MONITOR, or HOLD policy exit code:
+
+```bash
+./build/telemetry_guard --csv examples/readings.csv --html \
+  --output telemetry-health.html --fail-on never
+```
+
 Choose how health states affect automation with `--fail-on monitor|hold|never`.
 The default, `monitor`, preserves the strict exit codes in the table below.
 `hold` allows MONITOR reports to exit successfully while HOLD still fails, and

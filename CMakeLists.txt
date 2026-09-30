@@ -124,6 +124,9 @@ add_test(NAME html_output COMMAND ${CMAKE_COMMAND}
 add_test(NAME sarif_output COMMAND ${CMAKE_COMMAND}
     -DTELEMETRY_GUARD=$<TARGET_FILE:telemetry_guard>
     -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/sarif_output.cmake)
+add_test(NAME output_file COMMAND ${CMAKE_COMMAND}
+    -DTELEMETRY_GUARD=$<TARGET_FILE:telemetry_guard>
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/output_file.cmake)
 add_test(NAME limit_margin_analysis COMMAND limit_margin_test)
 add_test(NAME rate_of_change_analysis COMMAND rate_of_change_test)
 add_test(NAME sequence_integrity_analysis COMMAND sequence_integrity_test)
