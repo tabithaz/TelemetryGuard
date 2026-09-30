@@ -14,6 +14,7 @@ All scenarios are synthetic and contain no operational data.
 - Health score, availability, degradation, and priority-channel reporting
 - Configurable health-score SLO gates for CI and deployment automation
 - Native GitHub Actions warnings and errors for degraded telemetry channels
+- Self-contained HTML health reports for review and attachment
 - Per-channel limit margins and portfolio-level minimum warning headroom
 - Small header-only diagnostic components with focused regression tests
 - Portable CMake builds and CI across GCC, Clang, and Apple Clang
@@ -120,6 +121,18 @@ characters in channel names and units are escaped safely:
 ```bash
 ./build/telemetry_guard --csv examples/readings.csv --github-annotations
 ```
+
+Generate a polished, self-contained HTML health report that can be opened in a
+browser or attached to an incident record without JavaScript or external assets:
+
+```bash
+./build/telemetry_guard --csv examples/readings.csv --html --fail-on never \
+  > telemetry-health.html
+```
+
+The report includes the disposition, health score, availability, blocking-issue
+count, priority channel, and a color-coded channel table. The existing
+`--fail-on` policy still controls the process exit code.
 
 Add `--json` to emit machine-readable channel results and the complete health
 summary instead of the formatted report:

@@ -329,6 +329,13 @@ std::string xmlEscape(const std::string& value) {
     return escaped.str();
 }
 
+std::string htmlStatusClass(TelemetryStatus status) {
+    if (status == TelemetryStatus::Nominal) return "nominal";
+    if (status == TelemetryStatus::Warning || status == TelemetryStatus::Aging)
+        return "warning";
+    return "critical";
+}
+
 std::string githubCommandEscape(const std::string& value, bool property) {
     std::ostringstream escaped;
     for (const char character : value) {
@@ -349,6 +356,7 @@ int main(int argc, char* argv[]) {
     bool eventsOutput = false;
     bool junitOutput = false;
     bool githubOutput = false;
+    bool htmlOutput = false;
     std::string csvPath;
     std::string baselinePath;
     std::string failOn = "monitor";
@@ -369,6 +377,8 @@ int main(int argc, char* argv[]) {
             junitOutput = true;
         } else if (argument == "--github-annotations" && !githubOutput) {
             githubOutput = true;
+        } else if (argument == "--html" && !htmlOutput) {
+            htmlOutput = true;
         } else if (argument == "--csv" && csvPath.empty() && index + 1 < argc) {
             csvPath = argv[++index];
         } else if (argument == "--baseline" && baselinePath.empty() && index + 1 < argc) {
@@ -407,7 +417,7 @@ int main(int argc, char* argv[]) {
         } else {
             std::cerr << "Usage: telemetry_guard [--csv path] [--baseline path] "
                          "[--json | --ndjson | --prometheus | --events | --junit | "
-                         "--github-annotations] "
+                         "--github-annotations | --html] "
                          "[--fail-on monitor|hold|never] [--min-health-score 0-100] "
                          "[--margin-drop-percent 0-100]\n";
             return 3;
@@ -418,7 +428,8 @@ int main(int argc, char* argv[]) {
                             static_cast<int>(prometheusOutput) +
                             static_cast<int>(eventsOutput) +
                             static_cast<int>(junitOutput) +
-                            static_cast<int>(githubOutput);
+                            static_cast<int>(githubOutput) +
+                            static_cast<int>(htmlOutput);
     if (outputModes > 1) {
         std::cerr << "Input error: output modes are mutually exclusive\n";
         return 3;
@@ -441,7 +452,7 @@ int main(int argc, char* argv[]) {
     }
     const bool structuredOutput = jsonOutput || ndjsonOutput ||
                                   prometheusOutput || eventsOutput || junitOutput ||
-                                  githubOutput;
+                                  githubOutput || htmlOutput;
     const std::vector<TelemetryReading> sample = {
         {"Altitude", 18250.0, 0.0, 25000.0, -500.0, 27000.0, "m", 0.4, 1.5, 2.0},
         {"Velocity", 1240.0, 0.0, 1800.0, -100.0, 2000.0, "m/s", 0.7, 1.5, 2.0},
@@ -569,7 +580,70 @@ int main(int argc, char* argv[]) {
         ? channelDisposition
         : "HOLD";
 
-    if (githubOutput) {
+    if (htmlOutput) {
+        const std::string dispositionClass = disposition == "GO" ? "nominal" :
+            (disposition == "MONITOR" ? "warning" : "critical");
+        std::cout << "<!doctype html>\n<html lang=\"en\">\n<head>\n"
+                  << "  <meta charset=\"utf-8\">\n"
+                  << "  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n"
+                  << "  <title>TelemetryGuard Health Report</title>\n"
+                  << "  <style>\n"
+                  << "    :root{color-scheme:dark;--bg:#07111f;--panel:#101d2e;--line:#26364b;"
+                     "--text:#eef5ff;--muted:#9fb0c5;--good:#4ade80;--warn:#fbbf24;--bad:#fb7185}\n"
+                  << "    *{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at top right,#17365b 0,#07111f 42%);"
+                     "color:var(--text);font-family:Inter,ui-sans-serif,system-ui,sans-serif;min-height:100vh}\n"
+                  << "    main{width:min(1080px,calc(100% - 32px));margin:0 auto;padding:52px 0 64px}"
+                     "header{display:flex;justify-content:space-between;gap:24px;align-items:end;margin-bottom:30px}\n"
+                  << "    h1{font-size:clamp(2rem,5vw,3.5rem);letter-spacing:-.04em;margin:0}"
+                     ".eyebrow{color:#7dd3fc;font-size:.75rem;font-weight:800;letter-spacing:.18em;text-transform:uppercase;margin:0 0 10px}"
+                     ".subtitle{color:var(--muted);margin:8px 0 0}\n"
+                  << "    .hero-status{font-weight:850;font-size:1.05rem;border:1px solid currentColor;border-radius:999px;padding:10px 16px}"
+                     ".summary{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px}\n"
+                  << "    .card,.table-wrap{background:rgba(16,29,46,.88);border:1px solid var(--line);box-shadow:0 20px 55px rgba(0,0,0,.2);"
+                     "border-radius:18px}.card{padding:20px}.label{color:var(--muted);font-size:.75rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase}"
+                     ".value{font-size:1.7rem;font-weight:800;margin-top:8px}\n"
+                  << "    .table-wrap{overflow:hidden}table{border-collapse:collapse;width:100%}th,td{padding:16px 18px;text-align:left;border-bottom:1px solid var(--line)}"
+                     "th{color:var(--muted);font-size:.72rem;letter-spacing:.1em;text-transform:uppercase}tbody tr:last-child td{border-bottom:0}"
+                     "tbody tr:hover{background:rgba(125,211,252,.04)}\n"
+                  << "    .status{display:inline-block;border-radius:999px;padding:5px 9px;font-size:.72rem;font-weight:850;letter-spacing:.06em}"
+                     ".nominal{color:var(--good)}.warning{color:var(--warn)}.critical{color:var(--bad)}"
+                     ".status.nominal{background:rgba(74,222,128,.12)}.status.warning{background:rgba(251,191,36,.12)}.status.critical{background:rgba(251,113,133,.12)}\n"
+                  << "    footer{color:var(--muted);font-size:.8rem;margin-top:18px;text-align:right}"
+                     "@media(max-width:760px){header{align-items:start;flex-direction:column}.summary{grid-template-columns:repeat(2,1fr)}"
+                     ".table-wrap{overflow-x:auto}th,td{white-space:nowrap}}\n"
+                  << "  </style>\n</head>\n<body>\n<main>\n"
+                  << "  <header><div><p class=\"eyebrow\">Telemetry health</p>"
+                     "<h1>Mission Readiness</h1><p class=\"subtitle\">TelemetryGuard channel assessment</p></div>"
+                  << "<div class=\"hero-status " << dispositionClass << "\">"
+                  << xmlEscape(disposition) << "</div></header>\n"
+                  << "  <section class=\"summary\" aria-label=\"Health summary\">\n"
+                  << "    <article class=\"card\"><div class=\"label\">Health score</div><div class=\"value\">"
+                  << healthScore << "/100</div></article>\n"
+                  << "    <article class=\"card\"><div class=\"label\">Availability</div><div class=\"value\">"
+                  << std::fixed << std::setprecision(1) << availability << "%</div></article>\n"
+                  << "    <article class=\"card\"><div class=\"label\">Blocking issues</div><div class=\"value\">"
+                  << blockingIssueCount << "</div></article>\n"
+                  << "    <article class=\"card\"><div class=\"label\">Priority channel</div><div class=\"value\">"
+                  << xmlEscape(priorityChannel) << "</div></article>\n"
+                  << "  </section>\n  <section class=\"table-wrap\">\n"
+                  << "    <table><thead><tr><th>Channel</th><th>Value</th><th>Unit</th><th>Age</th><th>Status</th></tr></thead><tbody>\n";
+        for (std::size_t index = 0; index < readings.size(); ++index) {
+            const auto& reading = readings[index];
+            std::cout << "      <tr><td>" << xmlEscape(reading.channel) << "</td><td>";
+            if (std::isfinite(reading.value)) std::cout << reading.value;
+            else std::cout << "N/A";
+            std::cout << "</td><td>" << xmlEscape(reading.unit) << "</td><td>";
+            if (std::isfinite(reading.ageSeconds)) std::cout << reading.ageSeconds << " s";
+            else std::cout << "N/A";
+            std::cout << "</td><td><span class=\"status "
+                      << htmlStatusClass(statuses[index]) << "\">"
+                      << xmlEscape(statusLabel(statuses[index])) << "</span></td></tr>\n";
+        }
+        std::cout << "    </tbody></table>\n  </section>\n"
+                  << "  <footer>" << totalReadings << " channels evaluated · Priority status: "
+                  << xmlEscape(statusLabel(priorityStatus)) << "</footer>\n"
+                  << "</main>\n</body>\n</html>\n";
+    } else if (githubOutput) {
         for (std::size_t index = 0; index < readings.size(); ++index) {
             if (statuses[index] == TelemetryStatus::Nominal) continue;
             const auto& reading = readings[index];
