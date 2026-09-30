@@ -336,6 +336,24 @@ std::string htmlStatusClass(TelemetryStatus status) {
     return "critical";
 }
 
+std::string sarifRuleId(TelemetryStatus status) {
+    switch (status) {
+        case TelemetryStatus::Warning: return "TG001";
+        case TelemetryStatus::Critical: return "TG002";
+        case TelemetryStatus::Aging: return "TG003";
+        case TelemetryStatus::Stale: return "TG004";
+        case TelemetryStatus::MissingData: return "TG005";
+        case TelemetryStatus::InvalidTimestamp: return "TG006";
+        case TelemetryStatus::InvalidConfiguration: return "TG007";
+        case TelemetryStatus::Nominal: return "TG000";
+    }
+    return "TG000";
+}
+
+std::string sarifLevel(TelemetryStatus status) {
+    return requiresHold(status) ? "error" : "warning";
+}
+
 std::string githubCommandEscape(const std::string& value, bool property) {
     std::ostringstream escaped;
     for (const char character : value) {
@@ -357,6 +375,7 @@ int main(int argc, char* argv[]) {
     bool junitOutput = false;
     bool githubOutput = false;
     bool htmlOutput = false;
+    bool sarifOutput = false;
     std::string csvPath;
     std::string baselinePath;
     std::string failOn = "monitor";
@@ -379,6 +398,8 @@ int main(int argc, char* argv[]) {
             githubOutput = true;
         } else if (argument == "--html" && !htmlOutput) {
             htmlOutput = true;
+        } else if (argument == "--sarif" && !sarifOutput) {
+            sarifOutput = true;
         } else if (argument == "--csv" && csvPath.empty() && index + 1 < argc) {
             csvPath = argv[++index];
         } else if (argument == "--baseline" && baselinePath.empty() && index + 1 < argc) {
@@ -417,7 +438,7 @@ int main(int argc, char* argv[]) {
         } else {
             std::cerr << "Usage: telemetry_guard [--csv path] [--baseline path] "
                          "[--json | --ndjson | --prometheus | --events | --junit | "
-                         "--github-annotations | --html] "
+                         "--github-annotations | --html | --sarif] "
                          "[--fail-on monitor|hold|never] [--min-health-score 0-100] "
                          "[--margin-drop-percent 0-100]\n";
             return 3;
@@ -429,7 +450,8 @@ int main(int argc, char* argv[]) {
                             static_cast<int>(eventsOutput) +
                             static_cast<int>(junitOutput) +
                             static_cast<int>(githubOutput) +
-                            static_cast<int>(htmlOutput);
+                            static_cast<int>(htmlOutput) +
+                            static_cast<int>(sarifOutput);
     if (outputModes > 1) {
         std::cerr << "Input error: output modes are mutually exclusive\n";
         return 3;
@@ -452,7 +474,7 @@ int main(int argc, char* argv[]) {
     }
     const bool structuredOutput = jsonOutput || ndjsonOutput ||
                                   prometheusOutput || eventsOutput || junitOutput ||
-                                  githubOutput || htmlOutput;
+                                  githubOutput || htmlOutput || sarifOutput;
     const std::vector<TelemetryReading> sample = {
         {"Altitude", 18250.0, 0.0, 25000.0, -500.0, 27000.0, "m", 0.4, 1.5, 2.0},
         {"Velocity", 1240.0, 0.0, 1800.0, -100.0, 2000.0, "m/s", 0.7, 1.5, 2.0},
@@ -580,7 +602,46 @@ int main(int argc, char* argv[]) {
         ? channelDisposition
         : "HOLD";
 
-    if (htmlOutput) {
+    if (sarifOutput) {
+        std::cout << "{\"$schema\":\"https://json.schemastore.org/sarif-2.1.0.json\","
+                     "\"version\":\"2.1.0\",\"runs\":[{\"tool\":{\"driver\":{"
+                     "\"name\":\"TelemetryGuard\",\"version\":\"0.1.0\","
+                     "\"informationUri\":\"https://github.com/tabithaz/TelemetryGuard\","
+                     "\"rules\":["
+                     "{\"id\":\"TG001\",\"name\":\"WarningLimit\",\"shortDescription\":{\"text\":\"Telemetry value crossed a warning limit\"}},"
+                     "{\"id\":\"TG002\",\"name\":\"CriticalLimit\",\"shortDescription\":{\"text\":\"Telemetry value crossed a critical limit\"}},"
+                     "{\"id\":\"TG003\",\"name\":\"AgingTelemetry\",\"shortDescription\":{\"text\":\"Telemetry is approaching its freshness limit\"}},"
+                     "{\"id\":\"TG004\",\"name\":\"StaleTelemetry\",\"shortDescription\":{\"text\":\"Telemetry exceeded its freshness limit\"}},"
+                     "{\"id\":\"TG005\",\"name\":\"MissingData\",\"shortDescription\":{\"text\":\"Telemetry data is missing\"}},"
+                     "{\"id\":\"TG006\",\"name\":\"InvalidTimestamp\",\"shortDescription\":{\"text\":\"Telemetry timestamp is invalid\"}},"
+                     "{\"id\":\"TG007\",\"name\":\"InvalidConfiguration\",\"shortDescription\":{\"text\":\"Telemetry limits or freshness configuration is invalid\"}}]}},";
+        std::cout << "\"automationDetails\":{\"id\":\"TelemetryGuard/"
+                  << jsonEscape(disposition) << "\"},\"invocations\":[{"
+                  << "\"executionSuccessful\":true,\"exitCode\":"
+                  << policyExitCode(disposition, failOn) << "}],\"results\":[";
+        bool wroteResult = false;
+        for (std::size_t index = 0; index < readings.size(); ++index) {
+            if (statuses[index] == TelemetryStatus::Nominal) continue;
+            if (wroteResult) std::cout << ',';
+            wroteResult = true;
+            const auto& reading = readings[index];
+            std::cout << "{\"ruleId\":\"" << sarifRuleId(statuses[index])
+                      << "\",\"level\":\"" << sarifLevel(statuses[index])
+                      << "\",\"message\":{\"text\":\""
+                      << jsonEscape(reading.channel + ": " + statusLabel(statuses[index]))
+                      << "\"},\"properties\":{\"channel\":\""
+                      << jsonEscape(reading.channel) << "\",\"status\":\""
+                      << statusLabel(statuses[index]) << "\",\"value\":";
+            if (std::isfinite(reading.value)) std::cout << reading.value;
+            else std::cout << "null";
+            std::cout << ",\"unit\":\"" << jsonEscape(reading.unit)
+                      << "\",\"ageSeconds\":";
+            if (std::isfinite(reading.ageSeconds)) std::cout << reading.ageSeconds;
+            else std::cout << "null";
+            std::cout << "}}";
+        }
+        std::cout << "]}]}\n";
+    } else if (htmlOutput) {
         const std::string dispositionClass = disposition == "GO" ? "nominal" :
             (disposition == "MONITOR" ? "warning" : "critical");
         std::cout << "<!doctype html>\n<html lang=\"en\">\n<head>\n"

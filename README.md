@@ -15,6 +15,7 @@ All scenarios are synthetic and contain no operational data.
 - Configurable health-score SLO gates for CI and deployment automation
 - Native GitHub Actions warnings and errors for degraded telemetry channels
 - Self-contained HTML health reports for review and attachment
+- SARIF 2.1.0 findings for standardized analysis and code-scanning pipelines
 - Per-channel limit margins and portfolio-level minimum warning headroom
 - Small header-only diagnostic components with focused regression tests
 - Portable CMake builds and CI across GCC, Clang, and Apple Clang
@@ -133,6 +134,17 @@ browser or attached to an incident record without JavaScript or external assets:
 The report includes the disposition, health score, availability, blocking-issue
 count, priority channel, and a color-coded channel table. The existing
 `--fail-on` policy still controls the process exit code.
+
+Emit SARIF 2.1.0 for code-scanning and standardized static-analysis tooling:
+
+```bash
+./build/telemetry_guard --csv examples/readings.csv --sarif --fail-on never \
+  > telemetry-health.sarif
+```
+
+Each degraded channel becomes a finding with a stable TelemetryGuard rule ID,
+warning or error severity, status, value, unit, and age. Nominal channels are
+omitted, while the run records the overall disposition and policy exit code.
 
 Add `--json` to emit machine-readable channel results and the complete health
 summary instead of the formatted report:
