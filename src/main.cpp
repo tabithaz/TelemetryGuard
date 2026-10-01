@@ -382,6 +382,7 @@ int main(int argc, char* argv[]) {
     std::string failOn = "monitor";
     bool failOnProvided = false;
     std::optional<int> minimumHealthScore;
+    std::optional<int> maximumRegressions;
     std::optional<double> marginDropPercent;
     for (int index = 1; index < argc; ++index) {
         const std::string argument = argv[index];
@@ -438,13 +439,26 @@ int main(int argc, char* argv[]) {
                              "greater than 0 and at most 100\n";
                 return 3;
             }
+        } else if (argument == "--max-regressions" &&
+                   !maximumRegressions.has_value() && index + 1 < argc) {
+            const std::string value = argv[++index];
+            try {
+                std::size_t consumed = 0;
+                const int maximum = std::stoi(value, &consumed);
+                if (consumed != value.size() || maximum < 0)
+                    throw std::invalid_argument("out of range");
+                maximumRegressions = maximum;
+            } catch (const std::exception&) {
+                std::cerr << "Input error: --max-regressions must be a non-negative integer\n";
+                return 3;
+            }
         } else {
             std::cerr << "Usage: telemetry_guard [--csv path] [--baseline path] "
                          "[--json | --ndjson | --prometheus | --events | --junit | "
                          "--github-annotations | --html | --sarif] "
                          "[--output path] "
                          "[--fail-on monitor|hold|never] [--min-health-score 0-100] "
-                         "[--margin-drop-percent 0-100]\n";
+                         "[--margin-drop-percent 0-100] [--max-regressions count]\n";
             return 3;
         }
     }
@@ -474,6 +488,10 @@ int main(int argc, char* argv[]) {
     }
     if (marginDropPercent.has_value() && !eventsOutput) {
         std::cerr << "Input error: --margin-drop-percent requires --events\n";
+        return 3;
+    }
+    if (maximumRegressions.has_value() && baselinePath.empty()) {
+        std::cerr << "Input error: --max-regressions requires --baseline\n";
         return 3;
     }
     const bool structuredOutput = jsonOutput || ndjsonOutput ||
@@ -613,7 +631,9 @@ int main(int argc, char* argv[]) {
         invalidTimestampCount, configurationErrorCount);
     const bool healthScoreGateMet = !minimumHealthScore.has_value() ||
                                     healthScore >= *minimumHealthScore;
-    const std::string disposition = healthScoreGateMet
+    const bool regressionGateMet = !maximumRegressions.has_value() ||
+                                   regressionCount <= *maximumRegressions;
+    const std::string disposition = healthScoreGateMet && regressionGateMet
         ? channelDisposition
         : "HOLD";
 
@@ -736,6 +756,9 @@ int main(int argc, char* argv[]) {
         std::ostringstream summary;
         summary << "Disposition " << disposition << ", health score "
                 << healthScore << "/100, blocking issues " << blockingIssueCount;
+        if (maximumRegressions.has_value())
+            summary << ", regressions " << regressionCount << "/"
+                    << *maximumRegressions;
         std::cout << "::notice title=TelemetryGuard summary::"
                   << githubCommandEscape(summary.str(), false) << '\n';
     } else if (junitOutput) {
@@ -753,6 +776,8 @@ int main(int argc, char* argv[]) {
                   << xmlEscape(disposition) << "\"/>\n"
                   << "    <property name=\"availability_percent\" value=\""
                   << std::fixed << std::setprecision(1) << availability << "\"/>\n"
+                  << "    <property name=\"regression_gate_met\" value=\""
+                  << (regressionGateMet ? "true" : "false") << "\"/>\n"
                   << "  </properties>\n";
         for (std::size_t index = 0; index < readings.size(); ++index) {
             const auto& reading = readings[index];
@@ -823,6 +848,11 @@ int main(int argc, char* argv[]) {
         else std::cout << "null";
         std::cout << ",\"health_score_gate_met\":"
                   << (healthScoreGateMet ? "true" : "false")
+                  << ",\"maximum_regressions\":";
+        if (maximumRegressions.has_value()) std::cout << *maximumRegressions;
+        else std::cout << "null";
+        std::cout << ",\"regression_gate_met\":"
+                  << (regressionGateMet ? "true" : "false")
                   << ",\"disposition\":\"" << disposition << "\"}\n";
     } else if (jsonOutput) {
         std::cout << "{\"channels\":[";
@@ -876,6 +906,11 @@ int main(int argc, char* argv[]) {
         else std::cout << "null";
         std::cout << ",\"health_score_gate_met\":"
                   << (healthScoreGateMet ? "true" : "false")
+                  << ",\"maximum_regressions\":";
+        if (maximumRegressions.has_value()) std::cout << *maximumRegressions;
+        else std::cout << "null";
+        std::cout << ",\"regression_gate_met\":"
+                  << (regressionGateMet ? "true" : "false")
                   << ",\"comparison_enabled\":"
                   << (baselineStatuses.empty() ? "false" : "true")
                   << ",\"regressions\":" << regressionCount
@@ -936,6 +971,11 @@ int main(int argc, char* argv[]) {
         else std::cout << "null";
         std::cout << ",\"health_score_gate_met\":"
                   << (healthScoreGateMet ? "true" : "false")
+                  << ",\"maximum_regressions\":";
+        if (maximumRegressions.has_value()) std::cout << *maximumRegressions;
+        else std::cout << "null";
+        std::cout << ",\"regression_gate_met\":"
+                  << (regressionGateMet ? "true" : "false")
                   << ",\"comparison_enabled\":"
                   << (baselineStatuses.empty() ? "false" : "true")
                   << ",\"regressions\":" << regressionCount
@@ -1003,6 +1043,15 @@ int main(int argc, char* argv[]) {
                       << recoveryCount << '\n'
                       << "telemetry_guard_transitions{transition=\"unchanged\"} "
                       << unchangedCount << '\n';
+            if (maximumRegressions.has_value())
+                std::cout << "# HELP telemetry_guard_maximum_regressions Configured regression budget.\n"
+                          << "# TYPE telemetry_guard_maximum_regressions gauge\n"
+                          << "telemetry_guard_maximum_regressions "
+                          << *maximumRegressions << '\n'
+                          << "# HELP telemetry_guard_regression_gate_met Whether the regression budget passed.\n"
+                          << "# TYPE telemetry_guard_regression_gate_met gauge\n"
+                          << "telemetry_guard_regression_gate_met "
+                          << (regressionGateMet ? 1 : 0) << '\n';
         }
     } else std::cout << "\nNominal readings: " << nominalCount << '\n'
               << "Warnings: " << warningCount << '\n'
@@ -1032,6 +1081,10 @@ int main(int argc, char* argv[]) {
             std::cout << "Minimum health score: " << *minimumHealthScore << "\n"
                       << "Health score gate: "
                       << (healthScoreGateMet ? "PASS" : "FAIL") << '\n';
+        if (maximumRegressions.has_value())
+            std::cout << "Maximum regressions: " << *maximumRegressions << "\n"
+                      << "Regression gate: "
+                      << (regressionGateMet ? "PASS" : "FAIL") << '\n';
     }
 
     if (!structuredOutput && !baselineStatuses.empty())

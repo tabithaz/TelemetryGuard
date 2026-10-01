@@ -194,6 +194,16 @@ Prometheus output exports both values as gauges:
 ./build/telemetry_guard --csv examples/readings.csv --json --min-health-score 90
 ```
 
+When comparing a baseline, enforce a channel-regression budget with
+`--max-regressions`. Exceeding the budget promotes the disposition to HOLD,
+while `--fail-on` still controls the process exit policy. JSON, NDJSON, event,
+JUnit, GitHub annotation, and Prometheus outputs expose the gate result:
+
+```bash
+./build/telemetry_guard --csv current.csv --baseline previous.csv --json \
+  --max-regressions 0
+```
+
 Use `--prometheus` instead of `--json` to emit Prometheus exposition text for
 direct ingestion by monitoring infrastructure:
 
