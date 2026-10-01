@@ -102,6 +102,33 @@ std::string statusLabel(TelemetryStatus status) {
     return "UNKNOWN";
 }
 
+std::string diagnosticReason(const TelemetryReading& reading,
+                             TelemetryStatus status) {
+    switch (status) {
+        case TelemetryStatus::InvalidConfiguration:
+            return "invalid_configuration";
+        case TelemetryStatus::MissingData:
+            return "missing_value";
+        case TelemetryStatus::InvalidTimestamp:
+            return "invalid_age";
+        case TelemetryStatus::Stale:
+            return "age_above_maximum";
+        case TelemetryStatus::Critical:
+            return reading.value < reading.criticalMinimum
+                ? "value_below_critical_minimum"
+                : "value_above_critical_maximum";
+        case TelemetryStatus::Warning:
+            return reading.value < reading.warningMinimum
+                ? "value_below_warning_minimum"
+                : "value_above_warning_maximum";
+        case TelemetryStatus::Aging:
+            return "age_above_warning";
+        case TelemetryStatus::Nominal:
+            return "within_limits";
+    }
+    return "unknown";
+}
+
 int statusPriority(TelemetryStatus status) {
     switch (status) {
         case TelemetryStatus::InvalidConfiguration: return 7;
@@ -591,7 +618,8 @@ int main(int argc, char* argv[]) {
             if (status == TelemetryStatus::MissingData) std::cout << "N/A";
             else std::cout << reading.value;
             std::cout << std::setw(8) << reading.unit << std::setw(14) << statusLabel(status)
-                      << "age=" << reading.ageSeconds << "s";
+                      << "age=" << reading.ageSeconds << "s reason="
+                      << diagnosticReason(reading, status);
             if (!baselineStatuses.empty())
                 std::cout << " previous=" << statusLabel(baselineStatuses.at(reading.channel));
             if (margin.has_value())
@@ -673,7 +701,8 @@ int main(int argc, char* argv[]) {
                       << "\",\"ageSeconds\":";
             if (std::isfinite(reading.ageSeconds)) std::cout << reading.ageSeconds;
             else std::cout << "null";
-            std::cout << "}}";
+            std::cout << ",\"reason\":\""
+                      << diagnosticReason(reading, statuses[index]) << "\"}}";
         }
         std::cout << "]}]}\n";
     } else if (htmlOutput) {
@@ -722,7 +751,7 @@ int main(int argc, char* argv[]) {
                   << "    <article class=\"card\"><div class=\"label\">Priority channel</div><div class=\"value\">"
                   << xmlEscape(priorityChannel) << "</div></article>\n"
                   << "  </section>\n  <section class=\"table-wrap\">\n"
-                  << "    <table><thead><tr><th>Channel</th><th>Value</th><th>Unit</th><th>Age</th><th>Status</th></tr></thead><tbody>\n";
+                  << "    <table><thead><tr><th>Channel</th><th>Value</th><th>Unit</th><th>Age</th><th>Status</th><th>Reason</th></tr></thead><tbody>\n";
         for (std::size_t index = 0; index < readings.size(); ++index) {
             const auto& reading = readings[index];
             std::cout << "      <tr><td>" << xmlEscape(reading.channel) << "</td><td>";
@@ -733,7 +762,9 @@ int main(int argc, char* argv[]) {
             else std::cout << "N/A";
             std::cout << "</td><td><span class=\"status "
                       << htmlStatusClass(statuses[index]) << "\">"
-                      << xmlEscape(statusLabel(statuses[index])) << "</span></td></tr>\n";
+                      << xmlEscape(statusLabel(statuses[index])) << "</span></td><td>"
+                      << xmlEscape(diagnosticReason(reading, statuses[index]))
+                      << "</td></tr>\n";
         }
         std::cout << "    </tbody></table>\n  </section>\n"
                   << "  <footer>" << totalReadings << " channels evaluated · Priority status: "
@@ -751,7 +782,8 @@ int main(int argc, char* argv[]) {
             if (std::isfinite(reading.value)) std::cout << reading.value;
             else std::cout << "null";
             std::cout << "; unit=" << githubCommandEscape(reading.unit, false)
-                      << "; age_seconds=" << reading.ageSeconds << '\n';
+                      << "; age_seconds=" << reading.ageSeconds
+                      << "; reason=" << diagnosticReason(reading, statuses[index]) << '\n';
         }
         std::ostringstream summary;
         summary << "Disposition " << disposition << ", health score "
@@ -791,7 +823,9 @@ int main(int argc, char* argv[]) {
                 if (std::isfinite(reading.value)) std::cout << reading.value;
                 else std::cout << "null";
                 std::cout << " unit=" << xmlEscape(reading.unit)
-                          << " age_seconds=" << reading.ageSeconds << "</failure>\n";
+                          << " age_seconds=" << reading.ageSeconds
+                          << " reason=" << diagnosticReason(reading, statuses[index])
+                          << "</failure>\n";
             }
             std::cout << "  </testcase>\n";
         }
@@ -809,6 +843,10 @@ int main(int argc, char* argv[]) {
                           << "\",\"channel\":\"" << jsonEscape(reading.channel)
                           << "\",\"previous_status\":\"" << statusLabel(previous)
                           << "\",\"current_status\":\"" << statusLabel(statuses[index])
+                          << "\",\"previous_reason\":\""
+                          << diagnosticReason(baselineReadings.at(reading.channel), previous)
+                          << "\",\"current_reason\":\""
+                          << diagnosticReason(reading, statuses[index])
                           << "\",\"value\":";
                 if (std::isfinite(reading.value)) std::cout << reading.value;
                 else std::cout << "null";
@@ -825,7 +863,8 @@ int main(int argc, char* argv[]) {
             ++marginRegressionCount;
             std::cout << "{\"type\":\"margin_regression\",\"channel\":\""
                       << jsonEscape(reading.channel) << "\",\"status\":\""
-                      << statusLabel(statuses[index])
+                      << statusLabel(statuses[index]) << "\",\"reason\":\""
+                      << diagnosticReason(reading, statuses[index])
                       << "\",\"previous_warning_headroom_percent\":"
                       << previousMargin->warningHeadroomPercent
                       << ",\"current_warning_headroom_percent\":"
@@ -867,7 +906,9 @@ int main(int argc, char* argv[]) {
                       << "\",\"age_seconds\":";
             if (std::isfinite(reading.ageSeconds)) std::cout << reading.ageSeconds;
             else std::cout << "null";
-            std::cout << ",\"status\":\"" << statusLabel(statuses[index]) << "\"";
+            std::cout << ",\"status\":\"" << statusLabel(statuses[index])
+                      << "\",\"reason\":\""
+                      << diagnosticReason(reading, statuses[index]) << "\"";
             if (!baselineStatuses.empty())
                 std::cout << ",\"previous_status\":\""
                           << statusLabel(baselineStatuses.at(reading.channel)) << "\"";
@@ -932,7 +973,9 @@ int main(int argc, char* argv[]) {
                       << "\",\"age_seconds\":";
             if (std::isfinite(reading.ageSeconds)) std::cout << reading.ageSeconds;
             else std::cout << "null";
-            std::cout << ",\"status\":\"" << statusLabel(statuses[index]) << "\"";
+            std::cout << ",\"status\":\"" << statusLabel(statuses[index])
+                      << "\",\"reason\":\""
+                      << diagnosticReason(reading, statuses[index]) << "\"";
             if (!baselineStatuses.empty())
                 std::cout << ",\"previous_status\":\""
                           << statusLabel(baselineStatuses.at(reading.channel)) << "\"";

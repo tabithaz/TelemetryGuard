@@ -103,6 +103,9 @@ add_test(NAME health_score_gate COMMAND ${CMAKE_COMMAND}
 add_test(NAME regression_gate COMMAND ${CMAKE_COMMAND}
     -DTELEMETRY_GUARD=$<TARGET_FILE:telemetry_guard>
     -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/regression_gate.cmake)
+add_test(NAME diagnostic_reasons COMMAND ${CMAKE_COMMAND}
+    -DTELEMETRY_GUARD=$<TARGET_FILE:telemetry_guard>
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/diagnostic_reasons.cmake)
 add_test(NAME json_output COMMAND ${CMAKE_COMMAND}
     -DTELEMETRY_GUARD=$<TARGET_FILE:telemetry_guard>
     -DCSV_FILE=${CMAKE_CURRENT_SOURCE_DIR}/examples/readings.csv
