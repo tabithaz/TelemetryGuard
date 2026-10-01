@@ -409,6 +409,7 @@ int main(int argc, char* argv[]) {
     std::string failOn = "monitor";
     bool failOnProvided = false;
     std::optional<int> minimumHealthScore;
+    std::optional<double> minimumAvailabilityPercent;
     std::optional<int> maximumRegressions;
     std::optional<double> marginDropPercent;
     for (int index = 1; index < argc; ++index) {
@@ -451,6 +452,20 @@ int main(int argc, char* argv[]) {
                 std::cerr << "Input error: --min-health-score must be an integer from 0 to 100\n";
                 return 3;
             }
+        } else if (argument == "--min-availability" &&
+                   !minimumAvailabilityPercent.has_value() && index + 1 < argc) {
+            const std::string value = argv[++index];
+            try {
+                std::size_t consumed = 0;
+                const double threshold = std::stod(value, &consumed);
+                if (consumed != value.size() || !std::isfinite(threshold) ||
+                    threshold < 0.0 || threshold > 100.0)
+                    throw std::invalid_argument("out of range");
+                minimumAvailabilityPercent = threshold;
+            } catch (const std::exception&) {
+                std::cerr << "Input error: --min-availability must be a number from 0 to 100\n";
+                return 3;
+            }
         } else if (argument == "--margin-drop-percent" &&
                    !marginDropPercent.has_value() && index + 1 < argc) {
             const std::string value = argv[++index];
@@ -485,6 +500,7 @@ int main(int argc, char* argv[]) {
                          "--github-annotations | --html | --sarif] "
                          "[--output path] "
                          "[--fail-on monitor|hold|never] [--min-health-score 0-100] "
+                         "[--min-availability 0-100] "
                          "[--margin-drop-percent 0-100] [--max-regressions count]\n";
             return 3;
         }
@@ -659,9 +675,12 @@ int main(int argc, char* argv[]) {
         invalidTimestampCount, configurationErrorCount);
     const bool healthScoreGateMet = !minimumHealthScore.has_value() ||
                                     healthScore >= *minimumHealthScore;
+    const bool availabilityGateMet = !minimumAvailabilityPercent.has_value() ||
+                                     availability >= *minimumAvailabilityPercent;
     const bool regressionGateMet = !maximumRegressions.has_value() ||
                                    regressionCount <= *maximumRegressions;
-    const std::string disposition = healthScoreGateMet && regressionGateMet
+    const std::string disposition = healthScoreGateMet && availabilityGateMet &&
+                                    regressionGateMet
         ? channelDisposition
         : "HOLD";
 
@@ -791,6 +810,9 @@ int main(int argc, char* argv[]) {
         if (maximumRegressions.has_value())
             summary << ", regressions " << regressionCount << "/"
                     << *maximumRegressions;
+        if (minimumAvailabilityPercent.has_value())
+            summary << ", availability " << std::fixed << std::setprecision(1)
+                    << availability << "%/" << *minimumAvailabilityPercent << "%";
         std::cout << "::notice title=TelemetryGuard summary::"
                   << githubCommandEscape(summary.str(), false) << '\n';
     } else if (junitOutput) {
@@ -808,6 +830,13 @@ int main(int argc, char* argv[]) {
                   << xmlEscape(disposition) << "\"/>\n"
                   << "    <property name=\"availability_percent\" value=\""
                   << std::fixed << std::setprecision(1) << availability << "\"/>\n"
+                  << "    <property name=\"availability_gate_met\" value=\""
+                  << (availabilityGateMet ? "true" : "false") << "\"/>\n"
+                  << "    <property name=\"minimum_availability_percent\" value=\"";
+        if (minimumAvailabilityPercent.has_value())
+            std::cout << *minimumAvailabilityPercent;
+        else std::cout << "not_configured";
+        std::cout << "\"/>\n"
                   << "    <property name=\"regression_gate_met\" value=\""
                   << (regressionGateMet ? "true" : "false") << "\"/>\n"
                   << "  </properties>\n";
@@ -887,6 +916,12 @@ int main(int argc, char* argv[]) {
         else std::cout << "null";
         std::cout << ",\"health_score_gate_met\":"
                   << (healthScoreGateMet ? "true" : "false")
+                  << ",\"minimum_availability_percent\":";
+        if (minimumAvailabilityPercent.has_value())
+            std::cout << *minimumAvailabilityPercent;
+        else std::cout << "null";
+        std::cout << ",\"availability_gate_met\":"
+                  << (availabilityGateMet ? "true" : "false")
                   << ",\"maximum_regressions\":";
         if (maximumRegressions.has_value()) std::cout << *maximumRegressions;
         else std::cout << "null";
@@ -947,6 +982,12 @@ int main(int argc, char* argv[]) {
         else std::cout << "null";
         std::cout << ",\"health_score_gate_met\":"
                   << (healthScoreGateMet ? "true" : "false")
+                  << ",\"minimum_availability_percent\":";
+        if (minimumAvailabilityPercent.has_value())
+            std::cout << *minimumAvailabilityPercent;
+        else std::cout << "null";
+        std::cout << ",\"availability_gate_met\":"
+                  << (availabilityGateMet ? "true" : "false")
                   << ",\"maximum_regressions\":";
         if (maximumRegressions.has_value()) std::cout << *maximumRegressions;
         else std::cout << "null";
@@ -1014,6 +1055,12 @@ int main(int argc, char* argv[]) {
         else std::cout << "null";
         std::cout << ",\"health_score_gate_met\":"
                   << (healthScoreGateMet ? "true" : "false")
+                  << ",\"minimum_availability_percent\":";
+        if (minimumAvailabilityPercent.has_value())
+            std::cout << *minimumAvailabilityPercent;
+        else std::cout << "null";
+        std::cout << ",\"availability_gate_met\":"
+                  << (availabilityGateMet ? "true" : "false")
                   << ",\"maximum_regressions\":";
         if (maximumRegressions.has_value()) std::cout << *maximumRegressions;
         else std::cout << "null";
@@ -1077,6 +1124,15 @@ int main(int argc, char* argv[]) {
                       << "# TYPE telemetry_guard_health_score_gate_met gauge\n"
                       << "telemetry_guard_health_score_gate_met "
                       << (healthScoreGateMet ? 1 : 0) << '\n';
+        if (minimumAvailabilityPercent.has_value())
+            std::cout << "# HELP telemetry_guard_minimum_availability_percent Configured availability SLO.\n"
+                      << "# TYPE telemetry_guard_minimum_availability_percent gauge\n"
+                      << "telemetry_guard_minimum_availability_percent "
+                      << *minimumAvailabilityPercent << '\n'
+                      << "# HELP telemetry_guard_availability_gate_met Whether the availability SLO passed.\n"
+                      << "# TYPE telemetry_guard_availability_gate_met gauge\n"
+                      << "telemetry_guard_availability_gate_met "
+                      << (availabilityGateMet ? 1 : 0) << '\n';
         if (!baselineStatuses.empty()) {
             std::cout << "# HELP telemetry_guard_transitions Number of channel status transitions.\n"
                       << "# TYPE telemetry_guard_transitions gauge\n"
@@ -1124,6 +1180,10 @@ int main(int argc, char* argv[]) {
             std::cout << "Minimum health score: " << *minimumHealthScore << "\n"
                       << "Health score gate: "
                       << (healthScoreGateMet ? "PASS" : "FAIL") << '\n';
+        if (minimumAvailabilityPercent.has_value())
+            std::cout << "Minimum availability: " << *minimumAvailabilityPercent << "%\n"
+                      << "Availability gate: "
+                      << (availabilityGateMet ? "PASS" : "FAIL") << '\n';
         if (maximumRegressions.has_value())
             std::cout << "Maximum regressions: " << *maximumRegressions << "\n"
                       << "Regression gate: "

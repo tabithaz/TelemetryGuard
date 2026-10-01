@@ -14,6 +14,7 @@ All scenarios are synthetic and contain no operational data.
 - Structured transition-event streams for alerting and incident pipelines
 - Health score, availability, degradation, and priority-channel reporting
 - Configurable health-score SLO gates for CI and deployment automation
+- Configurable telemetry-availability SLO gates for deployment decisions
 - Native GitHub Actions warnings and errors for degraded telemetry channels
 - Self-contained HTML health reports for review and attachment
 - SARIF 2.1.0 findings for standardized analysis and code-scanning pipelines
@@ -196,6 +197,17 @@ Prometheus output exports both values as gauges:
 
 ```bash
 ./build/telemetry_guard --csv examples/readings.csv --json --min-health-score 90
+```
+
+Enforce a minimum percentage of available channels with `--min-availability`.
+Stale, missing, invalid-timestamp, and configuration-error channels count as
+unavailable. A failed SLO promotes the disposition to HOLD, while `--fail-on`
+controls the exit code. JSON, NDJSON, transition-event, JUnit, GitHub annotation,
+Prometheus, and human reports expose the configured target and gate result.
+
+```bash
+./build/telemetry_guard --csv examples/readings.csv --json \
+  --min-availability 99.9 --fail-on hold
 ```
 
 When comparing a baseline, enforce a channel-regression budget with

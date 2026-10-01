@@ -100,6 +100,9 @@ add_test(NAME exit_policy COMMAND ${CMAKE_COMMAND}
 add_test(NAME health_score_gate COMMAND ${CMAKE_COMMAND}
     -DTELEMETRY_GUARD=$<TARGET_FILE:telemetry_guard>
     -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/health_score_gate.cmake)
+add_test(NAME availability_gate COMMAND ${CMAKE_COMMAND}
+    -DTELEMETRY_GUARD=$<TARGET_FILE:telemetry_guard>
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/availability_gate.cmake)
 add_test(NAME regression_gate COMMAND ${CMAKE_COMMAND}
     -DTELEMETRY_GUARD=$<TARGET_FILE:telemetry_guard>
     -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/regression_gate.cmake)
