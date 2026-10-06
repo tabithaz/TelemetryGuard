@@ -410,6 +410,7 @@ int main(int argc, char* argv[]) {
     bool failOnProvided = false;
     std::optional<int> minimumHealthScore;
     std::optional<double> minimumAvailabilityPercent;
+    std::optional<int> minimumChannelCount;
     std::optional<int> maximumRegressions;
     std::optional<double> marginDropPercent;
     for (int index = 1; index < argc; ++index) {
@@ -466,6 +467,19 @@ int main(int argc, char* argv[]) {
                 std::cerr << "Input error: --min-availability must be a number from 0 to 100\n";
                 return 3;
             }
+        } else if (argument == "--min-channels" &&
+                   !minimumChannelCount.has_value() && index + 1 < argc) {
+            const std::string value = argv[++index];
+            try {
+                std::size_t consumed = 0;
+                const int minimum = std::stoi(value, &consumed);
+                if (consumed != value.size() || minimum <= 0)
+                    throw std::invalid_argument("out of range");
+                minimumChannelCount = minimum;
+            } catch (const std::exception&) {
+                std::cerr << "Input error: --min-channels must be a positive integer\n";
+                return 3;
+            }
         } else if (argument == "--margin-drop-percent" &&
                    !marginDropPercent.has_value() && index + 1 < argc) {
             const std::string value = argv[++index];
@@ -501,6 +515,7 @@ int main(int argc, char* argv[]) {
                          "[--output path] "
                          "[--fail-on monitor|hold|never] [--min-health-score 0-100] "
                          "[--min-availability 0-100] "
+                         "[--min-channels count] "
                          "[--margin-drop-percent 0-100] [--max-regressions count]\n";
             return 3;
         }
@@ -677,10 +692,12 @@ int main(int argc, char* argv[]) {
                                     healthScore >= *minimumHealthScore;
     const bool availabilityGateMet = !minimumAvailabilityPercent.has_value() ||
                                      availability >= *minimumAvailabilityPercent;
+    const bool channelCountGateMet = !minimumChannelCount.has_value() ||
+                                     totalReadings >= *minimumChannelCount;
     const bool regressionGateMet = !maximumRegressions.has_value() ||
                                    regressionCount <= *maximumRegressions;
     const std::string disposition = healthScoreGateMet && availabilityGateMet &&
-                                    regressionGateMet
+                                    channelCountGateMet && regressionGateMet
         ? channelDisposition
         : "HOLD";
 
@@ -813,6 +830,9 @@ int main(int argc, char* argv[]) {
         if (minimumAvailabilityPercent.has_value())
             summary << ", availability " << std::fixed << std::setprecision(1)
                     << availability << "%/" << *minimumAvailabilityPercent << "%";
+        if (minimumChannelCount.has_value())
+            summary << ", channels " << totalReadings << "/"
+                    << *minimumChannelCount;
         std::cout << "::notice title=TelemetryGuard summary::"
                   << githubCommandEscape(summary.str(), false) << '\n';
     } else if (junitOutput) {
@@ -837,6 +857,14 @@ int main(int argc, char* argv[]) {
             std::cout << *minimumAvailabilityPercent;
         else std::cout << "not_configured";
         std::cout << "\"/>\n"
+                  << "    <property name=\"channel_count\" value=\""
+                  << totalReadings << "\"/>\n"
+                  << "    <property name=\"minimum_channel_count\" value=\"";
+        if (minimumChannelCount.has_value()) std::cout << *minimumChannelCount;
+        else std::cout << "not_configured";
+        std::cout << "\"/>\n"
+                  << "    <property name=\"channel_count_gate_met\" value=\""
+                  << (channelCountGateMet ? "true" : "false") << "\"/>\n"
                   << "    <property name=\"regression_gate_met\" value=\""
                   << (regressionGateMet ? "true" : "false") << "\"/>\n"
                   << "  </properties>\n";
@@ -922,6 +950,11 @@ int main(int argc, char* argv[]) {
         else std::cout << "null";
         std::cout << ",\"availability_gate_met\":"
                   << (availabilityGateMet ? "true" : "false")
+                  << ",\"minimum_channel_count\":";
+        if (minimumChannelCount.has_value()) std::cout << *minimumChannelCount;
+        else std::cout << "null";
+        std::cout << ",\"channel_count_gate_met\":"
+                  << (channelCountGateMet ? "true" : "false")
                   << ",\"maximum_regressions\":";
         if (maximumRegressions.has_value()) std::cout << *maximumRegressions;
         else std::cout << "null";
@@ -988,6 +1021,11 @@ int main(int argc, char* argv[]) {
         else std::cout << "null";
         std::cout << ",\"availability_gate_met\":"
                   << (availabilityGateMet ? "true" : "false")
+                  << ",\"minimum_channel_count\":";
+        if (minimumChannelCount.has_value()) std::cout << *minimumChannelCount;
+        else std::cout << "null";
+        std::cout << ",\"channel_count_gate_met\":"
+                  << (channelCountGateMet ? "true" : "false")
                   << ",\"maximum_regressions\":";
         if (maximumRegressions.has_value()) std::cout << *maximumRegressions;
         else std::cout << "null";
@@ -1061,6 +1099,11 @@ int main(int argc, char* argv[]) {
         else std::cout << "null";
         std::cout << ",\"availability_gate_met\":"
                   << (availabilityGateMet ? "true" : "false")
+                  << ",\"minimum_channel_count\":";
+        if (minimumChannelCount.has_value()) std::cout << *minimumChannelCount;
+        else std::cout << "null";
+        std::cout << ",\"channel_count_gate_met\":"
+                  << (channelCountGateMet ? "true" : "false")
                   << ",\"maximum_regressions\":";
         if (maximumRegressions.has_value()) std::cout << *maximumRegressions;
         else std::cout << "null";
@@ -1133,6 +1176,15 @@ int main(int argc, char* argv[]) {
                       << "# TYPE telemetry_guard_availability_gate_met gauge\n"
                       << "telemetry_guard_availability_gate_met "
                       << (availabilityGateMet ? 1 : 0) << '\n';
+        if (minimumChannelCount.has_value())
+            std::cout << "# HELP telemetry_guard_minimum_channel_count Configured telemetry completeness floor.\n"
+                      << "# TYPE telemetry_guard_minimum_channel_count gauge\n"
+                      << "telemetry_guard_minimum_channel_count "
+                      << *minimumChannelCount << '\n'
+                      << "# HELP telemetry_guard_channel_count_gate_met Whether the completeness gate passed.\n"
+                      << "# TYPE telemetry_guard_channel_count_gate_met gauge\n"
+                      << "telemetry_guard_channel_count_gate_met "
+                      << (channelCountGateMet ? 1 : 0) << '\n';
         if (!baselineStatuses.empty()) {
             std::cout << "# HELP telemetry_guard_transitions Number of channel status transitions.\n"
                       << "# TYPE telemetry_guard_transitions gauge\n"
@@ -1184,6 +1236,10 @@ int main(int argc, char* argv[]) {
             std::cout << "Minimum availability: " << *minimumAvailabilityPercent << "%\n"
                       << "Availability gate: "
                       << (availabilityGateMet ? "PASS" : "FAIL") << '\n';
+        if (minimumChannelCount.has_value())
+            std::cout << "Minimum channel count: " << *minimumChannelCount << "\n"
+                      << "Channel count gate: "
+                      << (channelCountGateMet ? "PASS" : "FAIL") << '\n';
         if (maximumRegressions.has_value())
             std::cout << "Maximum regressions: " << *maximumRegressions << "\n"
                       << "Regression gate: "

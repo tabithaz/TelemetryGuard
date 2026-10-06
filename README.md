@@ -15,6 +15,7 @@ All scenarios are synthetic and contain no operational data.
 - Health score, availability, degradation, and priority-channel reporting
 - Configurable health-score SLO gates for CI and deployment automation
 - Configurable telemetry-availability SLO gates for deployment decisions
+- Minimum channel-count gates that detect incomplete telemetry snapshots
 - Native GitHub Actions warnings and errors for degraded telemetry channels
 - Self-contained HTML health reports for review and attachment
 - SARIF 2.1.0 findings for standardized analysis and code-scanning pipelines
@@ -208,6 +209,17 @@ Prometheus, and human reports expose the configured target and gate result.
 ```bash
 ./build/telemetry_guard --csv examples/readings.csv --json \
   --min-availability 99.9 --fail-on hold
+```
+
+Detect silently truncated snapshots with `--min-channels`. If fewer channels
+arrive than the configured floor, TelemetryGuard promotes the disposition to
+HOLD even when every received value is nominal. Human, JSON, NDJSON,
+transition-event, JUnit, GitHub annotation, and Prometheus reports expose the
+expected count and whether the completeness gate passed.
+
+```bash
+./build/telemetry_guard --csv examples/readings.csv --json \
+  --min-channels 8 --fail-on hold
 ```
 
 When comparing a baseline, enforce a channel-regression budget with
