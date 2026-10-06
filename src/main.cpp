@@ -413,6 +413,7 @@ int main(int argc, char* argv[]) {
     std::optional<int> minimumChannelCount;
     std::optional<int> maximumRegressions;
     std::optional<double> marginDropPercent;
+    std::vector<std::string> requiredChannels;
     for (int index = 1; index < argc; ++index) {
         const std::string argument = argv[index];
         if (argument == "--json" && !jsonOutput) {
@@ -480,6 +481,20 @@ int main(int argc, char* argv[]) {
                 std::cerr << "Input error: --min-channels must be a positive integer\n";
                 return 3;
             }
+        } else if (argument == "--require-channel" && index + 1 < argc) {
+            const std::string channel = argv[++index];
+            if (channel.empty() || channel.find_first_not_of(" \t") == std::string::npos ||
+                channel.find_first_not_of(" \t") != 0 ||
+                channel.find_last_not_of(" \t") != channel.size() - 1) {
+                std::cerr << "Input error: --require-channel must be a nonblank channel name without surrounding whitespace\n";
+                return 3;
+            }
+            if (std::find(requiredChannels.begin(), requiredChannels.end(), channel) !=
+                requiredChannels.end()) {
+                std::cerr << "Input error: duplicate --require-channel: " << channel << '\n';
+                return 3;
+            }
+            requiredChannels.push_back(channel);
         } else if (argument == "--margin-drop-percent" &&
                    !marginDropPercent.has_value() && index + 1 < argc) {
             const std::string value = argv[++index];
@@ -516,6 +531,7 @@ int main(int argc, char* argv[]) {
                          "[--fail-on monitor|hold|never] [--min-health-score 0-100] "
                          "[--min-availability 0-100] "
                          "[--min-channels count] "
+                         "[--require-channel name]... "
                          "[--margin-drop-percent 0-100] [--max-regressions count]\n";
             return 3;
         }
@@ -694,10 +710,19 @@ int main(int argc, char* argv[]) {
                                      availability >= *minimumAvailabilityPercent;
     const bool channelCountGateMet = !minimumChannelCount.has_value() ||
                                      totalReadings >= *minimumChannelCount;
+    std::set<std::string> observedChannels;
+    for (const auto& reading : readings) observedChannels.insert(reading.channel);
+    std::vector<std::string> missingRequiredChannels;
+    for (const auto& channel : requiredChannels) {
+        if (observedChannels.find(channel) == observedChannels.end())
+            missingRequiredChannels.push_back(channel);
+    }
+    const bool requiredChannelsGateMet = missingRequiredChannels.empty();
     const bool regressionGateMet = !maximumRegressions.has_value() ||
                                    regressionCount <= *maximumRegressions;
     const std::string disposition = healthScoreGateMet && availabilityGateMet &&
-                                    channelCountGateMet && regressionGateMet
+                                    channelCountGateMet && requiredChannelsGateMet &&
+                                    regressionGateMet
         ? channelDisposition
         : "HOLD";
 
@@ -833,6 +858,9 @@ int main(int argc, char* argv[]) {
         if (minimumChannelCount.has_value())
             summary << ", channels " << totalReadings << "/"
                     << *minimumChannelCount;
+        if (!requiredChannels.empty())
+            summary << ", required channels "
+                    << (requiredChannelsGateMet ? "present" : "missing");
         std::cout << "::notice title=TelemetryGuard summary::"
                   << githubCommandEscape(summary.str(), false) << '\n';
     } else if (junitOutput) {
@@ -865,6 +893,10 @@ int main(int argc, char* argv[]) {
         std::cout << "\"/>\n"
                   << "    <property name=\"channel_count_gate_met\" value=\""
                   << (channelCountGateMet ? "true" : "false") << "\"/>\n"
+                  << "    <property name=\"required_channels_gate_met\" value=\""
+                  << (requiredChannelsGateMet ? "true" : "false") << "\"/>\n"
+                  << "    <property name=\"missing_required_channel_count\" value=\""
+                  << missingRequiredChannels.size() << "\"/>\n"
                   << "    <property name=\"regression_gate_met\" value=\""
                   << (regressionGateMet ? "true" : "false") << "\"/>\n"
                   << "  </properties>\n";
@@ -955,6 +987,14 @@ int main(int argc, char* argv[]) {
         else std::cout << "null";
         std::cout << ",\"channel_count_gate_met\":"
                   << (channelCountGateMet ? "true" : "false")
+                  << ",\"required_channels_gate_met\":"
+                  << (requiredChannelsGateMet ? "true" : "false")
+                  << ",\"missing_required_channels\":[";
+        for (std::size_t index = 0; index < missingRequiredChannels.size(); ++index) {
+            if (index > 0) std::cout << ',';
+            std::cout << '"' << jsonEscape(missingRequiredChannels[index]) << '"';
+        }
+        std::cout << "]"
                   << ",\"maximum_regressions\":";
         if (maximumRegressions.has_value()) std::cout << *maximumRegressions;
         else std::cout << "null";
@@ -1026,6 +1066,14 @@ int main(int argc, char* argv[]) {
         else std::cout << "null";
         std::cout << ",\"channel_count_gate_met\":"
                   << (channelCountGateMet ? "true" : "false")
+                  << ",\"required_channels_gate_met\":"
+                  << (requiredChannelsGateMet ? "true" : "false")
+                  << ",\"missing_required_channels\":[";
+        for (std::size_t index = 0; index < missingRequiredChannels.size(); ++index) {
+            if (index > 0) std::cout << ',';
+            std::cout << '"' << jsonEscape(missingRequiredChannels[index]) << '"';
+        }
+        std::cout << "]"
                   << ",\"maximum_regressions\":";
         if (maximumRegressions.has_value()) std::cout << *maximumRegressions;
         else std::cout << "null";
@@ -1104,6 +1152,14 @@ int main(int argc, char* argv[]) {
         else std::cout << "null";
         std::cout << ",\"channel_count_gate_met\":"
                   << (channelCountGateMet ? "true" : "false")
+                  << ",\"required_channels_gate_met\":"
+                  << (requiredChannelsGateMet ? "true" : "false")
+                  << ",\"missing_required_channels\":[";
+        for (std::size_t index = 0; index < missingRequiredChannels.size(); ++index) {
+            if (index > 0) std::cout << ',';
+            std::cout << '"' << jsonEscape(missingRequiredChannels[index]) << '"';
+        }
+        std::cout << "]"
                   << ",\"maximum_regressions\":";
         if (maximumRegressions.has_value()) std::cout << *maximumRegressions;
         else std::cout << "null";
@@ -1185,6 +1241,19 @@ int main(int argc, char* argv[]) {
                       << "# TYPE telemetry_guard_channel_count_gate_met gauge\n"
                       << "telemetry_guard_channel_count_gate_met "
                       << (channelCountGateMet ? 1 : 0) << '\n';
+        if (!requiredChannels.empty()) {
+            std::cout << "# HELP telemetry_guard_required_channels Configured required channel identities.\n"
+                      << "# TYPE telemetry_guard_required_channels gauge\n"
+                      << "telemetry_guard_required_channels " << requiredChannels.size() << '\n'
+                      << "# HELP telemetry_guard_missing_required_channels Required channels absent from the snapshot.\n"
+                      << "# TYPE telemetry_guard_missing_required_channels gauge\n"
+                      << "telemetry_guard_missing_required_channels "
+                      << missingRequiredChannels.size() << '\n'
+                      << "# HELP telemetry_guard_required_channels_gate_met Whether all required channels are present.\n"
+                      << "# TYPE telemetry_guard_required_channels_gate_met gauge\n"
+                      << "telemetry_guard_required_channels_gate_met "
+                      << (requiredChannelsGateMet ? 1 : 0) << '\n';
+        }
         if (!baselineStatuses.empty()) {
             std::cout << "# HELP telemetry_guard_transitions Number of channel status transitions.\n"
                       << "# TYPE telemetry_guard_transitions gauge\n"
@@ -1240,6 +1309,16 @@ int main(int argc, char* argv[]) {
             std::cout << "Minimum channel count: " << *minimumChannelCount << "\n"
                       << "Channel count gate: "
                       << (channelCountGateMet ? "PASS" : "FAIL") << '\n';
+        if (!requiredChannels.empty()) {
+            std::cout << "Required channel gate: "
+                      << (requiredChannelsGateMet ? "PASS" : "FAIL") << '\n';
+            if (!missingRequiredChannels.empty()) {
+                std::cout << "Missing required channels:";
+                for (const auto& channel : missingRequiredChannels)
+                    std::cout << ' ' << channel;
+                std::cout << '\n';
+            }
+        }
         if (maximumRegressions.has_value())
             std::cout << "Maximum regressions: " << *maximumRegressions << "\n"
                       << "Regression gate: "

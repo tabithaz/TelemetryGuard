@@ -16,6 +16,7 @@ All scenarios are synthetic and contain no operational data.
 - Configurable health-score SLO gates for CI and deployment automation
 - Configurable telemetry-availability SLO gates for deployment decisions
 - Minimum channel-count gates that detect incomplete telemetry snapshots
+- Required-channel identity gates that catch missing mission-critical signals
 - Native GitHub Actions warnings and errors for degraded telemetry channels
 - Self-contained HTML health reports for review and attachment
 - SARIF 2.1.0 findings for standardized analysis and code-scanning pipelines
@@ -219,7 +220,17 @@ expected count and whether the completeness gate passed.
 
 ```bash
 ./build/telemetry_guard --csv examples/readings.csv --json \
-  --min-channels 8 --fail-on hold
+    --min-channels 8 --fail-on hold
+```
+
+Require specific critical signals with repeatable `--require-channel` options.
+This catches a missing named channel even when the snapshot still satisfies its
+minimum count. A missing requirement promotes the disposition to HOLD and is
+reported in JSON, NDJSON, JUnit, GitHub annotations, Prometheus, and human output.
+
+```bash
+./build/telemetry_guard --csv examples/readings.csv --json \
+  --require-channel "Altitude" --require-channel "Battery Voltage"
 ```
 
 When comparing a baseline, enforce a channel-regression budget with
