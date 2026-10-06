@@ -109,6 +109,10 @@ add_test(NAME channel_count_gate COMMAND ${CMAKE_COMMAND}
 add_test(NAME required_channel_gate COMMAND ${CMAKE_COMMAND}
     -DTELEMETRY_GUARD=$<TARGET_FILE:telemetry_guard>
     -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/required_channel_gate.cmake)
+add_test(NAME required_channels_manifest COMMAND ${CMAKE_COMMAND}
+    -DTELEMETRY_GUARD=$<TARGET_FILE:telemetry_guard>
+    -DCSV_FILE=${CMAKE_CURRENT_SOURCE_DIR}/examples/readings.csv
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/required_channels_manifest.cmake)
 add_test(NAME regression_gate COMMAND ${CMAKE_COMMAND}
     -DTELEMETRY_GUARD=$<TARGET_FILE:telemetry_guard>
     -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/regression_gate.cmake)

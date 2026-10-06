@@ -233,6 +233,24 @@ reported in JSON, NDJSON, JUnit, GitHub annotations, Prometheus, and human outpu
   --require-channel "Altitude" --require-channel "Battery Voltage"
 ```
 
+For larger deployments, store the required signal inventory in source control and
+load it with `--require-channels-file`. The manifest uses one exact channel name
+per line; blank lines and lines beginning with `#` are ignored. File entries can
+be combined with `--require-channel`, and duplicates are rejected so the policy
+remains unambiguous.
+
+```text
+# flight-critical channels
+Altitude
+Battery Voltage
+Guidance Quality
+```
+
+```bash
+./build/telemetry_guard --csv examples/readings.csv --json \
+  --require-channels-file config/required-channels.txt --fail-on hold
+```
+
 When comparing a baseline, enforce a channel-regression budget with
 `--max-regressions`. Exceeding the budget promotes the disposition to HOLD,
 while `--fail-on` still controls the process exit policy. JSON, NDJSON, event,

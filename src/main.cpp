@@ -315,6 +315,29 @@ std::vector<TelemetryReading> readCsvFile(const std::string& path) {
     return readCsv(file);
 }
 
+std::vector<std::string> readRequiredChannelsFile(const std::string& path) {
+    std::ifstream file(path);
+    if (!file) throw std::runtime_error("cannot open required channels file: " + path);
+    std::vector<std::string> channels;
+    std::string line;
+    std::size_t lineNumber = 0;
+    while (std::getline(file, line)) {
+        ++lineNumber;
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        if (line.empty() || line.front() == '#') continue;
+        if (line.find_first_not_of(" \t") == std::string::npos ||
+            line.find_first_not_of(" \t") != 0 ||
+            line.find_last_not_of(" \t") != line.size() - 1)
+            throw std::runtime_error("required channels file line " +
+                std::to_string(lineNumber) +
+                ": channel must be nonblank without surrounding whitespace");
+        channels.push_back(line);
+    }
+    if (file.bad()) throw std::runtime_error("failed while reading required channels file: " + path);
+    if (channels.empty()) throw std::runtime_error("required channels file contains no channels");
+    return channels;
+}
+
 std::string jsonEscape(const std::string& value) {
     std::ostringstream escaped;
     for (const unsigned char character : value) {
@@ -414,6 +437,7 @@ int main(int argc, char* argv[]) {
     std::optional<int> maximumRegressions;
     std::optional<double> marginDropPercent;
     std::vector<std::string> requiredChannels;
+    std::string requiredChannelsPath;
     for (int index = 1; index < argc; ++index) {
         const std::string argument = argv[index];
         if (argument == "--json" && !jsonOutput) {
@@ -495,6 +519,13 @@ int main(int argc, char* argv[]) {
                 return 3;
             }
             requiredChannels.push_back(channel);
+        } else if (argument == "--require-channels-file" &&
+                   requiredChannelsPath.empty() && index + 1 < argc) {
+            requiredChannelsPath = argv[++index];
+            if (requiredChannelsPath.empty()) {
+                std::cerr << "Input error: --require-channels-file needs a path\n";
+                return 3;
+            }
         } else if (argument == "--margin-drop-percent" &&
                    !marginDropPercent.has_value() && index + 1 < argc) {
             const std::string value = argv[++index];
@@ -532,6 +563,7 @@ int main(int argc, char* argv[]) {
                          "[--min-availability 0-100] "
                          "[--min-channels count] "
                          "[--require-channel name]... "
+                         "[--require-channels-file path] "
                          "[--margin-drop-percent 0-100] [--max-regressions count]\n";
             return 3;
         }
@@ -567,6 +599,20 @@ int main(int argc, char* argv[]) {
     if (maximumRegressions.has_value() && baselinePath.empty()) {
         std::cerr << "Input error: --max-regressions requires --baseline\n";
         return 3;
+    }
+    if (!requiredChannelsPath.empty()) {
+        try {
+            const auto fileChannels = readRequiredChannelsFile(requiredChannelsPath);
+            for (const auto& channel : fileChannels) {
+                if (std::find(requiredChannels.begin(), requiredChannels.end(), channel) !=
+                    requiredChannels.end())
+                    throw std::runtime_error("duplicate required channel: " + channel);
+                requiredChannels.push_back(channel);
+            }
+        } catch (const std::exception& error) {
+            std::cerr << "Input error: " << error.what() << '\n';
+            return 3;
+        }
     }
     const bool structuredOutput = jsonOutput || ndjsonOutput ||
                                   prometheusOutput || eventsOutput || junitOutput ||
