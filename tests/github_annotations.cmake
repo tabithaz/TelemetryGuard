@@ -16,7 +16,10 @@ if(NOT result EQUAL 0 OR NOT error STREQUAL "")
     message(FATAL_ERROR "GitHub annotations command failed (${result}): ${error}")
 endif()
 
-string(REGEX MATCHALL "[^\n]+" lines "${output}")
+# Protect annotation field separators from CMake list expansion before counting
+# newline-delimited workflow commands.
+string(REPLACE ";" "\\;" escaped_output "${output}")
+string(REGEX MATCHALL "[^\n]+" lines "${escaped_output}")
 list(LENGTH lines line_count)
 if(NOT line_count EQUAL 4)
     message(FATAL_ERROR "Expected three annotations and one summary, got ${line_count}: ${output}")
