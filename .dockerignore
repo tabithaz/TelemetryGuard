@@ -1,0 +1,12 @@
+.git
+.github
+build*
+dist
+tests
+*.html
+*.json
+*.ndjson
+*.sarif
+*.xml
+*.zip
+*.tar.gz

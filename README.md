@@ -25,6 +25,7 @@ All scenarios are synthetic and contain no operational data.
 - Small header-only diagnostic components with focused regression tests
 - Portable CMake builds and CI across GCC, Clang, and Apple Clang
 - AddressSanitizer and UndefinedBehaviorSanitizer validation in CI
+- Reproducible multi-stage container image with an unprivileged runtime
 
 ## Diagnostic coverage
 
@@ -63,6 +64,21 @@ cd build && cpack
 
 The install places the executable under `bin/` and project documentation under
 the platform's standard documentation directory.
+
+## Container
+
+Build the production image and stream a telemetry snapshot through it without
+copying data into the container:
+
+```bash
+docker build -t telemetry-guard .
+docker run --rm -i telemetry-guard \
+  --csv - --json --fail-on never < examples/readings.csv
+```
+
+The multi-stage build keeps compilers and CMake out of the final image. The
+runtime uses an unprivileged numeric user, accepts every existing CLI option,
+and reports the installed version when started without arguments.
 
 ## Run the synthetic vehicle health check
 

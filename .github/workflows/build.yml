@@ -65,3 +65,28 @@ jobs:
           ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
           UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
         run: ctest --test-dir build-sanitized --output-on-failure
+
+  container:
+    runs-on: ubuntu-latest
+    name: Container smoke test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build production image
+        run: docker build --tag telemetry-guard:test .
+      - name: Verify version and non-root runtime
+        run: |
+          docker run --rm telemetry-guard:test | grep --fixed-strings "TelemetryGuard 0.2.0"
+          test "$(docker inspect --format '{{.Config.User}}' telemetry-guard:test)" = "65532:65532"
+      - name: Process telemetry from standard input
+        run: |
+          docker run --rm --interactive telemetry-guard:test \
+            --csv - --json --fail-on never < examples/readings.csv > container-report.json
+          python3 - <<'PY'
+          import json
+
+          with open("container-report.json", encoding="utf-8") as report_file:
+              report = json.load(report_file)
+
+          assert report["summary"]["disposition"] in {"GO", "MONITOR", "HOLD"}
+          assert len(report["channels"]) > 0
+          PY
