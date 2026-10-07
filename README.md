@@ -51,6 +51,18 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --parallel
 ```
 
+Install the versioned CLI with the standard CMake install flow, or build `.tar.gz`
+and `.zip` release archives with CPack:
+
+```bash
+cmake --install build --prefix ./dist
+./dist/bin/telemetry_guard --version
+cd build && cpack
+```
+
+The install places the executable under `bin/` and project documentation under
+the platform's standard documentation directory.
+
 ## Run the synthetic vehicle health check
 
 ```bash

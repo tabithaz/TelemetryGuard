@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(TelemetryGuard VERSION 0.1.0 LANGUAGES CXX)
+project(TelemetryGuard VERSION 0.2.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -8,6 +8,23 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 include(CTest)
 
 add_executable(telemetry_guard src/main.cpp)
+target_compile_definitions(telemetry_guard PRIVATE
+    TELEMETRY_GUARD_VERSION="${PROJECT_VERSION}")
+
+include(GNUInstallDirs)
+install(TARGETS telemetry_guard
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(FILES README.md
+    DESTINATION ${CMAKE_INSTALL_DOCDIR})
+
+set(CPACK_PACKAGE_NAME "TelemetryGuard")
+set(CPACK_PACKAGE_VENDOR "tabithaz")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY
+    "C++ telemetry health and release-gate diagnostics")
+set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
+set(CPACK_RESOURCE_FILE_README "${CMAKE_CURRENT_SOURCE_DIR}/README.md")
+set(CPACK_GENERATOR "TGZ;ZIP")
+include(CPack)
 if(BUILD_TESTING)
 add_executable(limit_margin_test tests/limit_margin_test.cpp)
 add_executable(rate_of_change_test tests/rate_of_change_test.cpp)
@@ -113,6 +130,11 @@ add_test(NAME required_channels_manifest COMMAND ${CMAKE_COMMAND}
     -DTELEMETRY_GUARD=$<TARGET_FILE:telemetry_guard>
     -DCSV_FILE=${CMAKE_CURRENT_SOURCE_DIR}/examples/readings.csv
     -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/required_channels_manifest.cmake)
+add_test(NAME install_layout COMMAND ${CMAKE_COMMAND}
+    -DBUILD_DIR=${CMAKE_CURRENT_BINARY_DIR}
+    -DTELEMETRY_GUARD=$<TARGET_FILE:telemetry_guard>
+    -DEXPECTED_VERSION=${PROJECT_VERSION}
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/install_layout.cmake)
 add_test(NAME regression_gate COMMAND ${CMAKE_COMMAND}
     -DTELEMETRY_GUARD=$<TARGET_FILE:telemetry_guard>
     -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/regression_gate.cmake)

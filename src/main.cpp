@@ -14,6 +14,10 @@
 
 #include "limit_margin.hpp"
 
+#ifndef TELEMETRY_GUARD_VERSION
+#define TELEMETRY_GUARD_VERSION "development"
+#endif
+
 struct TelemetryReading {
     std::string channel;
     double value;
@@ -418,6 +422,10 @@ std::string githubCommandEscape(const std::string& value, bool property) {
 }
 
 int main(int argc, char* argv[]) {
+    if (argc == 2 && std::string(argv[1]) == "--version") {
+        std::cout << "TelemetryGuard " << TELEMETRY_GUARD_VERSION << '\n';
+        return 0;
+    }
     bool jsonOutput = false;
     bool ndjsonOutput = false;
     bool prometheusOutput = false;
