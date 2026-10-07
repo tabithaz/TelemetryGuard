@@ -17,6 +17,7 @@ All scenarios are synthetic and contain no operational data.
 - Configurable telemetry-availability SLO gates for deployment decisions
 - Minimum channel-count gates that detect incomplete telemetry snapshots
 - Required-channel identity gates that catch missing mission-critical signals
+- Version-controlled policy files for reusable deployment acceptance criteria
 - Native GitHub Actions warnings and errors for degraded telemetry channels
 - Self-contained HTML health reports for review and attachment
 - SARIF 2.1.0 findings for standardized analysis and code-scanning pipelines
@@ -257,6 +258,30 @@ Altitude
 Battery Voltage
 Guidance Quality
 ```
+
+Combine deployment gates in a version-controlled policy with `--policy`.
+Command-line values override scalar policy settings, while required channels
+from both sources are merged and checked for duplicates. Unknown keys,
+duplicate scalar keys, and invalid values fail closed with the policy line number.
+
+```bash
+./build/telemetry_guard --csv examples/readings.csv \
+  --baseline examples/readings.csv --json \
+  --policy examples/mission-critical.policy
+```
+
+```text
+min_health_score=90
+min_availability=99.9
+min_channels=8
+max_regressions=0
+fail_on=hold
+required_channel=Altitude
+required_channel=Battery Voltage
+```
+
+`max_regressions` requires a baseline, just like the corresponding command-line
+option. The remaining supported keys are usable for single-snapshot checks.
 
 ```bash
 ./build/telemetry_guard --csv examples/readings.csv --json \

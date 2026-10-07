@@ -1,0 +1,9 @@
+# Version-controlled telemetry acceptance policy
+min_health_score=90
+min_availability=99.9
+min_channels=8
+max_regressions=0
+fail_on=hold
+required_channel=Altitude
+required_channel=Battery Voltage
+required_channel=Guidance Quality

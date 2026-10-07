@@ -130,6 +130,10 @@ add_test(NAME required_channels_manifest COMMAND ${CMAKE_COMMAND}
     -DTELEMETRY_GUARD=$<TARGET_FILE:telemetry_guard>
     -DCSV_FILE=${CMAKE_CURRENT_SOURCE_DIR}/examples/readings.csv
     -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/required_channels_manifest.cmake)
+add_test(NAME policy_file COMMAND ${CMAKE_COMMAND}
+    -DTELEMETRY_GUARD=$<TARGET_FILE:telemetry_guard>
+    -DCSV_FILE=${CMAKE_CURRENT_SOURCE_DIR}/examples/readings.csv
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/policy_file.cmake)
 add_test(NAME install_layout COMMAND ${CMAKE_COMMAND}
     -DBUILD_DIR=${CMAKE_CURRENT_BINARY_DIR}
     -DTELEMETRY_GUARD=$<TARGET_FILE:telemetry_guard>

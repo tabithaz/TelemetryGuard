@@ -342,6 +342,92 @@ std::vector<std::string> readRequiredChannelsFile(const std::string& path) {
     return channels;
 }
 
+struct TelemetryPolicy {
+    std::optional<int> minimumHealthScore;
+    std::optional<double> minimumAvailabilityPercent;
+    std::optional<int> minimumChannelCount;
+    std::optional<int> maximumRegressions;
+    std::optional<std::string> failOn;
+    std::vector<std::string> requiredChannels;
+};
+
+std::string trimPolicyValue(const std::string& value) {
+    const std::size_t first = value.find_first_not_of(" \t");
+    if (first == std::string::npos) return "";
+    return value.substr(first, value.find_last_not_of(" \t") - first + 1);
+}
+
+TelemetryPolicy readPolicyFile(const std::string& path) {
+    std::ifstream file(path);
+    if (!file) throw std::runtime_error("cannot open policy file: " + path);
+
+    TelemetryPolicy policy;
+    std::set<std::string> scalarKeys;
+    std::set<std::string> requiredChannels;
+    std::string line;
+    std::size_t lineNumber = 0;
+    while (std::getline(file, line)) {
+        ++lineNumber;
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        const std::string normalized = trimPolicyValue(line);
+        if (normalized.empty() || normalized.front() == '#') continue;
+        const std::size_t separator = normalized.find('=');
+        if (separator == std::string::npos)
+            throw std::runtime_error("policy file line " + std::to_string(lineNumber) +
+                                     ": expected key=value");
+        const std::string key = trimPolicyValue(normalized.substr(0, separator));
+        const std::string value = trimPolicyValue(normalized.substr(separator + 1));
+        if (key.empty() || value.empty())
+            throw std::runtime_error("policy file line " + std::to_string(lineNumber) +
+                                     ": key and value must be nonblank");
+
+        try {
+            if (key == "required_channel") {
+                if (!requiredChannels.insert(value).second)
+                    throw std::invalid_argument("duplicate required channel: " + value);
+                policy.requiredChannels.push_back(value);
+                continue;
+            }
+            if (!scalarKeys.insert(key).second)
+                throw std::invalid_argument("duplicate policy key: " + key);
+            std::size_t consumed = 0;
+            if (key == "min_health_score") {
+                const int threshold = std::stoi(value, &consumed);
+                if (consumed != value.size() || threshold < 0 || threshold > 100)
+                    throw std::invalid_argument("min_health_score must be an integer from 0 to 100");
+                policy.minimumHealthScore = threshold;
+            } else if (key == "min_availability") {
+                const double threshold = std::stod(value, &consumed);
+                if (consumed != value.size() || !std::isfinite(threshold) ||
+                    threshold < 0.0 || threshold > 100.0)
+                    throw std::invalid_argument("min_availability must be a number from 0 to 100");
+                policy.minimumAvailabilityPercent = threshold;
+            } else if (key == "min_channels") {
+                const int minimum = std::stoi(value, &consumed);
+                if (consumed != value.size() || minimum <= 0)
+                    throw std::invalid_argument("min_channels must be a positive integer");
+                policy.minimumChannelCount = minimum;
+            } else if (key == "max_regressions") {
+                const int maximum = std::stoi(value, &consumed);
+                if (consumed != value.size() || maximum < 0)
+                    throw std::invalid_argument("max_regressions must be a non-negative integer");
+                policy.maximumRegressions = maximum;
+            } else if (key == "fail_on") {
+                if (value != "monitor" && value != "hold" && value != "never")
+                    throw std::invalid_argument("fail_on must be monitor, hold, or never");
+                policy.failOn = value;
+            } else {
+                throw std::invalid_argument("unknown policy key: " + key);
+            }
+        } catch (const std::exception& error) {
+            throw std::runtime_error("policy file line " + std::to_string(lineNumber) +
+                                     ": " + error.what());
+        }
+    }
+    if (file.bad()) throw std::runtime_error("failed while reading policy file: " + path);
+    return policy;
+}
+
 std::string jsonEscape(const std::string& value) {
     std::ostringstream escaped;
     for (const unsigned char character : value) {
@@ -446,6 +532,7 @@ int main(int argc, char* argv[]) {
     std::optional<double> marginDropPercent;
     std::vector<std::string> requiredChannels;
     std::string requiredChannelsPath;
+    std::string policyPath;
     for (int index = 1; index < argc; ++index) {
         const std::string argument = argv[index];
         if (argument == "--json" && !jsonOutput) {
@@ -534,6 +621,12 @@ int main(int argc, char* argv[]) {
                 std::cerr << "Input error: --require-channels-file needs a path\n";
                 return 3;
             }
+        } else if (argument == "--policy" && policyPath.empty() && index + 1 < argc) {
+            policyPath = argv[++index];
+            if (policyPath.empty()) {
+                std::cerr << "Input error: --policy needs a path\n";
+                return 3;
+            }
         } else if (argument == "--margin-drop-percent" &&
                    !marginDropPercent.has_value() && index + 1 < argc) {
             const std::string value = argv[++index];
@@ -572,7 +665,32 @@ int main(int argc, char* argv[]) {
                          "[--min-channels count] "
                          "[--require-channel name]... "
                          "[--require-channels-file path] "
+                         "[--policy path] "
                          "[--margin-drop-percent 0-100] [--max-regressions count]\n";
+            return 3;
+        }
+    }
+    if (!policyPath.empty()) {
+        try {
+            const TelemetryPolicy policy = readPolicyFile(policyPath);
+            if (!minimumHealthScore.has_value())
+                minimumHealthScore = policy.minimumHealthScore;
+            if (!minimumAvailabilityPercent.has_value())
+                minimumAvailabilityPercent = policy.minimumAvailabilityPercent;
+            if (!minimumChannelCount.has_value())
+                minimumChannelCount = policy.minimumChannelCount;
+            if (!maximumRegressions.has_value())
+                maximumRegressions = policy.maximumRegressions;
+            if (!failOnProvided && policy.failOn.has_value())
+                failOn = *policy.failOn;
+            for (const auto& channel : policy.requiredChannels) {
+                if (std::find(requiredChannels.begin(), requiredChannels.end(), channel) !=
+                    requiredChannels.end())
+                    throw std::runtime_error("duplicate required channel: " + channel);
+                requiredChannels.push_back(channel);
+            }
+        } catch (const std::exception& error) {
+            std::cerr << "Input error: " << error.what() << '\n';
             return 3;
         }
     }
