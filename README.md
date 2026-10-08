@@ -26,6 +26,7 @@ All scenarios are synthetic and contain no operational data.
 - Portable CMake builds and CI across GCC, Clang, and Apple Clang
 - AddressSanitizer and UndefinedBehaviorSanitizer validation in CI
 - Reproducible multi-stage container image with an unprivileged runtime
+- CI-built release archives with verified SHA-256 checksums
 
 ## Diagnostic coverage
 
@@ -64,6 +65,11 @@ cd build && cpack
 
 The install places the executable under `bin/` and project documentation under
 the platform's standard documentation directory.
+
+Every push and pull request also builds the production CPack distributions,
+verifies that both archives contain a runnable versioned CLI, and publishes the
+`.tar.gz`, `.zip`, and `SHA256SUMS` files as a GitHub Actions artifact for 30
+days. Checksums are verified before the artifact can be uploaded.
 
 ## Container
 

@@ -90,3 +90,39 @@ jobs:
           assert report["summary"]["disposition"] in {"GO", "MONITOR", "HOLD"}
           assert len(report["channels"]) > 0
           PY
+
+  packages:
+    runs-on: ubuntu-latest
+    name: Verified release packages
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure production package
+        run: cmake -S . -B build-package -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
+      - name: Build production binary
+        run: cmake --build build-package --parallel
+      - name: Create release archives and checksums
+        run: |
+          cpack --config build-package/CPackConfig.cmake -B dist
+          cd dist
+          sha256sum -- *.tar.gz *.zip > SHA256SUMS
+          sha256sum --check SHA256SUMS
+      - name: Verify packaged CLI and archive contents
+        run: |
+          mkdir package-check
+          tar --extract --gzip --file "$(find dist -maxdepth 1 -name '*.tar.gz' -print -quit)" \
+            --directory package-check
+          packaged_cli="$(find package-check -type f -path '*/bin/telemetry_guard' -print -quit)"
+          test -n "$packaged_cli"
+          "$packaged_cli" --version | grep --fixed-strings "TelemetryGuard 0.2.0"
+          unzip -l "$(find dist -maxdepth 1 -name '*.zip' -print -quit)" \
+            | grep --fixed-strings "bin/telemetry_guard"
+      - name: Upload verified distributions
+        uses: actions/upload-artifact@v4
+        with:
+          name: telemetryguard-${{ github.sha }}
+          path: |
+            dist/*.tar.gz
+            dist/*.zip
+            dist/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 30
