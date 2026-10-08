@@ -451,6 +451,35 @@ std::string jsonEscape(const std::string& value) {
     return escaped.str();
 }
 
+std::string policyJson(const TelemetryPolicy& policy) {
+    std::ostringstream output;
+    output << std::setprecision(15)
+           << "{\"valid\":true,\"policy\":{"
+           << "\"min_health_score\":";
+    if (policy.minimumHealthScore.has_value()) output << *policy.minimumHealthScore;
+    else output << "null";
+    output << ",\"min_availability\":";
+    if (policy.minimumAvailabilityPercent.has_value())
+        output << *policy.minimumAvailabilityPercent;
+    else output << "null";
+    output << ",\"min_channels\":";
+    if (policy.minimumChannelCount.has_value()) output << *policy.minimumChannelCount;
+    else output << "null";
+    output << ",\"max_regressions\":";
+    if (policy.maximumRegressions.has_value()) output << *policy.maximumRegressions;
+    else output << "null";
+    output << ",\"fail_on\":";
+    if (policy.failOn.has_value()) output << '"' << jsonEscape(*policy.failOn) << '"';
+    else output << "null";
+    output << ",\"required_channels\":[";
+    for (std::size_t index = 0; index < policy.requiredChannels.size(); ++index) {
+        if (index > 0) output << ',';
+        output << '"' << jsonEscape(policy.requiredChannels[index]) << '"';
+    }
+    output << "]}}";
+    return output.str();
+}
+
 std::string xmlEscape(const std::string& value) {
     std::ostringstream escaped;
     for (const unsigned char character : value) {
@@ -511,6 +540,15 @@ int main(int argc, char* argv[]) {
     if (argc == 2 && std::string(argv[1]) == "--version") {
         std::cout << "TelemetryGuard " << TELEMETRY_GUARD_VERSION << '\n';
         return 0;
+    }
+    if (argc == 3 && std::string(argv[1]) == "--check-policy") {
+        try {
+            std::cout << policyJson(readPolicyFile(argv[2])) << '\n';
+            return 0;
+        } catch (const std::exception& error) {
+            std::cerr << "Policy validation failed: " << error.what() << '\n';
+            return 3;
+        }
     }
     bool jsonOutput = false;
     bool ndjsonOutput = false;
@@ -656,7 +694,8 @@ int main(int argc, char* argv[]) {
                 return 3;
             }
         } else {
-            std::cerr << "Usage: telemetry_guard [--csv path] [--baseline path] "
+            std::cerr << "Usage: telemetry_guard [--check-policy path] | "
+                         "[--csv path] [--baseline path] "
                          "[--json | --ndjson | --prometheus | --events | --junit | "
                          "--github-annotations | --html | --sarif] "
                          "[--output path] "

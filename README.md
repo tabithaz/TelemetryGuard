@@ -18,6 +18,7 @@ All scenarios are synthetic and contain no operational data.
 - Minimum channel-count gates that detect incomplete telemetry snapshots
 - Required-channel identity gates that catch missing mission-critical signals
 - Version-controlled policy files for reusable deployment acceptance criteria
+- Standalone policy validation with normalized JSON for CI and GitOps preflight checks
 - Native GitHub Actions warnings and errors for degraded telemetry channels
 - Self-contained HTML health reports for review and attachment
 - SARIF 2.1.0 findings for standardized analysis and code-scanning pipelines
@@ -304,6 +305,15 @@ required_channel=Battery Voltage
 
 `max_regressions` requires a baseline, just like the corresponding command-line
 option. The remaining supported keys are usable for single-snapshot checks.
+
+Validate a policy before deployment without loading telemetry by running
+`--check-policy`. A valid file returns normalized JSON and exit code 0. Invalid,
+unknown, duplicate, or unreadable configuration returns exit code 3 with the
+policy line number when available, making the command suitable for CI preflight.
+
+```bash
+./build/telemetry_guard --check-policy examples/mission-critical.policy
+```
 
 ```bash
 ./build/telemetry_guard --csv examples/readings.csv --json \
