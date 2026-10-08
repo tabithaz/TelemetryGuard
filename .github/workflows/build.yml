@@ -116,6 +116,30 @@ jobs:
           "$packaged_cli" --version | grep --fixed-strings "TelemetryGuard 0.2.0"
           unzip -l "$(find dist -maxdepth 1 -name '*.zip' -print -quit)" \
             | grep --fixed-strings "bin/telemetry_guard"
+      - name: Build image for software inventory
+        run: docker build --tag telemetry-guard:sbom .
+      - name: Generate SPDX software bill of materials
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+        with:
+          image: telemetry-guard:sbom
+          format: spdx-json
+          output-file: dist/telemetryguard.spdx.json
+          upload-artifact: false
+          upload-release-assets: false
+      - name: Validate SPDX inventory
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          sbom_path = Path("dist/telemetryguard.spdx.json")
+          document = json.loads(sbom_path.read_text(encoding="utf-8"))
+          assert document["spdxVersion"] == "SPDX-2.3"
+          assert document["SPDXID"] == "SPDXRef-DOCUMENT"
+          assert document["documentNamespace"].startswith("https://")
+          assert document["packages"], "SBOM must contain at least one package"
+          assert all(package.get("SPDXID") for package in document["packages"])
+          PY
       - name: Upload verified distributions
         uses: actions/upload-artifact@v4
         with:
@@ -124,5 +148,6 @@ jobs:
             dist/*.tar.gz
             dist/*.zip
             dist/SHA256SUMS
+            dist/telemetryguard.spdx.json
           if-no-files-found: error
           retention-days: 30

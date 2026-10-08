@@ -69,8 +69,10 @@ the platform's standard documentation directory.
 
 Every push and pull request also builds the production CPack distributions,
 verifies that both archives contain a runnable versioned CLI, and publishes the
-`.tar.gz`, `.zip`, and `SHA256SUMS` files as a GitHub Actions artifact for 30
-days. Checksums are verified before the artifact can be uploaded.
+`.tar.gz`, `.zip`, `SHA256SUMS`, and SPDX 2.3 JSON software bill of materials as
+a GitHub Actions artifact for 30 days. Checksums and the container-derived SBOM
+metadata and package inventory are verified before the artifact can be uploaded,
+giving release consumers a machine-readable record for supply-chain review.
 
 ## Container
 
