@@ -94,6 +94,11 @@ jobs:
   packages:
     runs-on: ubuntu-latest
     name: Verified release packages
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+      artifact-metadata: write
     steps:
       - uses: actions/checkout@v4
       - name: Configure production package
@@ -140,6 +145,14 @@ jobs:
           assert document["packages"], "SBOM must contain at least one package"
           assert all(package.get("SPDXID") for package in document["packages"])
           PY
+      - name: Attest release provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: |
+            dist/*.tar.gz
+            dist/*.zip
+            dist/SHA256SUMS
+            dist/telemetryguard.spdx.json
       - name: Upload verified distributions
         uses: actions/upload-artifact@v4
         with:

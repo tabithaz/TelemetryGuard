@@ -73,6 +73,9 @@ verifies that both archives contain a runnable versioned CLI, and publishes the
 a GitHub Actions artifact for 30 days. Checksums and the container-derived SBOM
 metadata and package inventory are verified before the artifact can be uploaded,
 giving release consumers a machine-readable record for supply-chain review.
+CI also creates a signed SLSA build-provenance attestation for every archive,
+checksum file, and SBOM. After downloading an artifact, verify its repository
+and workflow identity with `gh attestation verify <file> --repo tabithaz/TelemetryGuard`.
 
 ## Container
 
