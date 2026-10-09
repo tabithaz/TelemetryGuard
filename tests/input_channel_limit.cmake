@@ -36,6 +36,6 @@ execute_process(
     OUTPUT_VARIABLE accepted_output
     ERROR_VARIABLE accepted_error)
 if(NOT accepted_result EQUAL 0 OR
-   NOT accepted_output MATCHES "\\\"total\\\":3")
+   NOT accepted_output MATCHES "\\\"total_readings\\\":3")
     message(FATAL_ERROR "Input at configured limit failed: ${accepted_result}\n${accepted_output}\n${accepted_error}")
 endif()
