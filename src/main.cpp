@@ -457,6 +457,24 @@ std::string jsonEscape(const std::string& value) {
     return escaped.str();
 }
 
+std::string csvField(const std::string& value) {
+    const std::size_t first = value.find_first_not_of(" \t");
+    std::string safe = value;
+    if (first != std::string::npos &&
+        (value[first] == '=' || value[first] == '+' ||
+         value[first] == '-' || value[first] == '@'))
+        safe.insert(safe.begin(), '\'');
+
+    if (safe.find_first_of(",\"\r\n") == std::string::npos) return safe;
+    std::string escaped = "\"";
+    for (const char character : safe) {
+        if (character == '\"') escaped += "\"\"";
+        else escaped += character;
+    }
+    escaped += '\"';
+    return escaped;
+}
+
 std::string policyJson(const TelemetryPolicy& policy) {
     std::ostringstream output;
     output << std::setprecision(15)
@@ -564,6 +582,7 @@ int main(int argc, char* argv[]) {
     bool githubOutput = false;
     bool htmlOutput = false;
     bool sarifOutput = false;
+    bool csvReportOutput = false;
     std::string csvPath;
     std::string baselinePath;
     std::string outputPath;
@@ -597,6 +616,8 @@ int main(int argc, char* argv[]) {
             htmlOutput = true;
         } else if (argument == "--sarif" && !sarifOutput) {
             sarifOutput = true;
+        } else if (argument == "--report-csv" && !csvReportOutput) {
+            csvReportOutput = true;
         } else if (argument == "--csv" && csvPath.empty() && index + 1 < argc) {
             csvPath = argv[++index];
         } else if (argument == "--baseline" && baselinePath.empty() && index + 1 < argc) {
@@ -723,7 +744,7 @@ int main(int argc, char* argv[]) {
             std::cerr << "Usage: telemetry_guard [--check-policy path] | "
                          "[--csv path] [--baseline path] "
                          "[--json | --ndjson | --prometheus | --events | --junit | "
-                         "--github-annotations | --html | --sarif] "
+                         "--github-annotations | --html | --sarif | --report-csv] "
                          "[--output path] "
                          "[--fail-on monitor|hold|never] [--min-health-score 0-100] "
                          "[--min-availability 0-100] "
@@ -767,7 +788,8 @@ int main(int argc, char* argv[]) {
                             static_cast<int>(junitOutput) +
                             static_cast<int>(githubOutput) +
                             static_cast<int>(htmlOutput) +
-                            static_cast<int>(sarifOutput);
+                            static_cast<int>(sarifOutput) +
+                            static_cast<int>(csvReportOutput);
     if (outputModes > 1) {
         std::cerr << "Input error: output modes are mutually exclusive\n";
         return 3;
@@ -808,7 +830,8 @@ int main(int argc, char* argv[]) {
     }
     const bool structuredOutput = jsonOutput || ndjsonOutput ||
                                   prometheusOutput || eventsOutput || junitOutput ||
-                                  githubOutput || htmlOutput || sarifOutput;
+                                  githubOutput || htmlOutput || sarifOutput ||
+                                  csvReportOutput;
     const std::vector<TelemetryReading> sample = {
         {"Altitude", 18250.0, 0.0, 25000.0, -500.0, 27000.0, "m", 0.4, 1.5, 2.0},
         {"Velocity", 1240.0, 0.0, 1800.0, -100.0, 2000.0, "m/s", 0.7, 1.5, 2.0},
@@ -966,7 +989,36 @@ int main(int argc, char* argv[]) {
         ? channelDisposition
         : "HOLD";
 
-    if (sarifOutput) {
+    if (csvReportOutput) {
+        std::cout << "record_type,channel,value,unit,age_seconds,status,reason,"
+                     "previous_status,nearest_warning_margin,"
+                     "warning_headroom_percent,health_score,availability_percent,"
+                     "blocking_issues,disposition\n";
+        std::cout << std::setprecision(15);
+        for (std::size_t index = 0; index < readings.size(); ++index) {
+            const auto& reading = readings[index];
+            std::cout << "channel," << csvField(reading.channel) << ',';
+            if (std::isfinite(reading.value)) std::cout << reading.value;
+            std::cout << ',' << csvField(reading.unit) << ',';
+            if (std::isfinite(reading.ageSeconds)) std::cout << reading.ageSeconds;
+            std::cout << ',' << csvField(statusLabel(statuses[index]))
+                      << ',' << csvField(diagnosticReason(reading, statuses[index]))
+                      << ',';
+            if (!baselineStatuses.empty())
+                std::cout << csvField(
+                    statusLabel(baselineStatuses.at(reading.channel)));
+            std::cout << ',';
+            if (margins[index].has_value())
+                std::cout << margins[index]->nearestWarningMargin;
+            std::cout << ',';
+            if (margins[index].has_value())
+                std::cout << margins[index]->warningHeadroomPercent;
+            std::cout << ",,,,\n";
+        }
+        std::cout << "summary,,,,,,,,,," << healthScore << ','
+                  << availability << ',' << blockingIssueCount << ','
+                  << csvField(disposition) << '\n';
+    } else if (sarifOutput) {
         std::cout << "{\"$schema\":\"https://json.schemastore.org/sarif-2.1.0.json\","
                      "\"version\":\"2.1.0\",\"runs\":[{\"tool\":{\"driver\":{"
                      "\"name\":\"TelemetryGuard\",\"version\":\"0.1.0\","

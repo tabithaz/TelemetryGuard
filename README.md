@@ -20,6 +20,7 @@ All scenarios are synthetic and contain no operational data.
 - Version-controlled policy files for reusable deployment acceptance criteria
 - Standalone policy validation with normalized JSON for CI and GitOps preflight checks
 - Configurable input channel ceilings for bounded memory use in automation
+- Spreadsheet-safe CSV reports for analyst review and downstream pipelines
 - Native GitHub Actions warnings and errors for degraded telemetry channels
 - Self-contained HTML health reports for review and attachment
 - SARIF 2.1.0 findings for standardized analysis and code-scanning pipelines
@@ -230,6 +231,16 @@ the process still returns the configured GO, MONITOR, or HOLD policy exit code:
 ```bash
 ./build/telemetry_guard --csv examples/readings.csv --html \
   --output telemetry-health.html --fail-on never
+```
+
+Use `--report-csv` to export one row per channel plus a final health-summary
+row for spreadsheet review or data pipelines. Text fields that begin with
+spreadsheet formula characters are neutralized, missing numeric values remain
+empty, and the configured exit policy still controls the process result:
+
+```bash
+./build/telemetry_guard --csv examples/readings.csv --report-csv \
+  --output telemetry-health.csv --fail-on never
 ```
 
 Choose how health states affect automation with `--fail-on monitor|hold|never`.
