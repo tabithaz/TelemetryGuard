@@ -19,6 +19,7 @@ All scenarios are synthetic and contain no operational data.
 - Required-channel identity gates that catch missing mission-critical signals
 - Version-controlled policy files for reusable deployment acceptance criteria
 - Standalone policy validation with normalized JSON for CI and GitOps preflight checks
+- Configurable input channel ceilings for bounded memory use in automation
 - Native GitHub Actions warnings and errors for degraded telemetry channels
 - Self-contained HTML health reports for review and attachment
 - SARIF 2.1.0 findings for standardized analysis and code-scanning pipelines
@@ -144,6 +145,15 @@ pipeline integration without an intermediate file and works with every output mo
 
 ```bash
 cat examples/readings.csv | ./build/telemetry_guard --csv - --json
+```
+
+TelemetryGuard accepts at most 10,000 channels in each current or baseline CSV
+by default, bounding memory use for files and standard input. Use
+`--max-input-channels` to apply a tighter deployment-specific ceiling. Inputs
+over the limit fail atomically with exit code 3 before any report is emitted:
+
+```bash
+./build/telemetry_guard --csv readings.csv --max-input-channels 500 --json
 ```
 
 Emit a standard JUnit XML report for CI systems that can publish test results:

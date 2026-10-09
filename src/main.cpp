@@ -277,7 +277,8 @@ std::vector<std::string> parseCsvRow(const std::string& line) {
     return cells;
 }
 
-std::vector<TelemetryReading> readCsv(std::istream& input) {
+std::vector<TelemetryReading> readCsv(std::istream& input,
+                                      std::size_t maximumChannels) {
     const std::string header = "channel,value,warning_min,warning_max,critical_min,critical_max,unit,age_seconds,warning_age_seconds,max_age_seconds";
     std::string line;
     if (!std::getline(input, line)) throw std::runtime_error("invalid CSV header");
@@ -289,6 +290,10 @@ std::vector<TelemetryReading> readCsv(std::istream& input) {
     while (std::getline(input, line)) {
         ++lineNumber;
         try {
+            if (readings.size() >= maximumChannels)
+                throw std::invalid_argument(
+                    "channel count exceeds configured maximum of " +
+                    std::to_string(maximumChannels));
             if (!line.empty() && line.back() == '\r') line.pop_back();
             const std::vector<std::string> cells = parseCsvRow(line);
             if (cells.size() != 10 || cells[0].empty() || cells[6].empty())
@@ -312,11 +317,12 @@ std::vector<TelemetryReading> readCsv(std::istream& input) {
     return readings;
 }
 
-std::vector<TelemetryReading> readCsvFile(const std::string& path) {
-    if (path == "-") return readCsv(std::cin);
+std::vector<TelemetryReading> readCsvFile(const std::string& path,
+                                          std::size_t maximumChannels) {
+    if (path == "-") return readCsv(std::cin, maximumChannels);
     std::ifstream file(path);
     if (!file) throw std::runtime_error("cannot open input file: " + path);
-    return readCsv(file);
+    return readCsv(file, maximumChannels);
 }
 
 std::vector<std::string> readRequiredChannelsFile(const std::string& path) {
@@ -568,6 +574,8 @@ int main(int argc, char* argv[]) {
     std::optional<int> minimumChannelCount;
     std::optional<int> maximumRegressions;
     std::optional<double> marginDropPercent;
+    std::size_t maximumInputChannels = 10000;
+    bool maximumInputChannelsProvided = false;
     std::vector<std::string> requiredChannels;
     std::string requiredChannelsPath;
     std::string policyPath;
@@ -693,6 +701,24 @@ int main(int argc, char* argv[]) {
                 std::cerr << "Input error: --max-regressions must be a non-negative integer\n";
                 return 3;
             }
+        } else if (argument == "--max-input-channels" &&
+                   !maximumInputChannelsProvided && index + 1 < argc) {
+            const std::string value = argv[++index];
+            try {
+                if (value.empty() ||
+                    value.find_first_not_of("0123456789") != std::string::npos)
+                    throw std::invalid_argument("not an unsigned integer");
+                std::size_t consumed = 0;
+                const unsigned long long maximum = std::stoull(value, &consumed);
+                if (consumed != value.size() || maximum == 0 ||
+                    maximum > std::numeric_limits<std::size_t>::max())
+                    throw std::invalid_argument("out of range");
+                maximumInputChannels = static_cast<std::size_t>(maximum);
+                maximumInputChannelsProvided = true;
+            } catch (const std::exception&) {
+                std::cerr << "Input error: --max-input-channels must be a positive integer\n";
+                return 3;
+            }
         } else {
             std::cerr << "Usage: telemetry_guard [--check-policy path] | "
                          "[--csv path] [--baseline path] "
@@ -705,6 +731,7 @@ int main(int argc, char* argv[]) {
                          "[--require-channel name]... "
                          "[--require-channels-file path] "
                          "[--policy path] "
+                         "[--max-input-channels count] "
                          "[--margin-drop-percent 0-100] [--max-regressions count]\n";
             return 3;
         }
@@ -797,9 +824,11 @@ int main(int argc, char* argv[]) {
     std::map<std::string, TelemetryStatus> baselineStatuses;
     std::map<std::string, TelemetryReading> baselineReadings;
     try {
-        readings = csvPath.empty() ? sample : readCsvFile(csvPath);
+        readings = csvPath.empty() ? sample :
+            readCsvFile(csvPath, maximumInputChannels);
         if (!baselinePath.empty()) {
-            const std::vector<TelemetryReading> baseline = readCsvFile(baselinePath);
+            const std::vector<TelemetryReading> baseline =
+                readCsvFile(baselinePath, maximumInputChannels);
             for (const auto& reading : baseline)
                 baselineReadings.emplace(reading.channel, reading);
             for (const auto& reading : baseline)
