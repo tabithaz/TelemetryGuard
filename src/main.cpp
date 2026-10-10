@@ -781,7 +781,7 @@ int main(int argc, char* argv[]) {
             }
         } else {
             std::cerr << "Input error: unknown or incomplete option: "
-                      << argument << "\nRun telemetry_guard --help for usage.\n";
+                      << argument << "\nUsage: run telemetry_guard --help.\n";
             return 3;
         }
     }
