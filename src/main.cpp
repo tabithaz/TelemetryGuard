@@ -560,7 +560,46 @@ std::string githubCommandEscape(const std::string& value, bool property) {
     return escaped.str();
 }
 
+void printHelp(std::ostream& output) {
+    output
+        << "TelemetryGuard " << TELEMETRY_GUARD_VERSION << "\n\n"
+        << "Validate telemetry health and enforce deployment gates.\n\n"
+        << "Usage:\n"
+        << "  telemetry_guard [options]\n"
+        << "  telemetry_guard --check-policy PATH\n"
+        << "  telemetry_guard --version\n\n"
+        << "Input:\n"
+        << "  --csv PATH                    Read current telemetry CSV (use - for stdin)\n"
+        << "  --baseline PATH               Compare against a baseline CSV\n"
+        << "  --max-input-channels COUNT    Bound channels loaded per CSV (default: 10000)\n"
+        << "  --policy PATH                 Load a version-controlled gate policy\n"
+        << "  --check-policy PATH           Validate and normalize a policy, then exit\n\n"
+        << "Output (choose at most one):\n"
+        << "  --json | --ndjson | --prometheus | --events | --junit\n"
+        << "  --github-annotations | --html | --sarif | --report-csv\n"
+        << "  --output PATH                 Write the selected report to a file\n\n"
+        << "Gates:\n"
+        << "  --fail-on monitor|hold|never  Set the disposition that causes failure\n"
+        << "  --min-health-score 0-100      Require a minimum weighted health score\n"
+        << "  --min-availability 0-100      Require a minimum availability percentage\n"
+        << "  --min-channels COUNT          Require a minimum channel count\n"
+        << "  --require-channel NAME        Require a channel (repeatable)\n"
+        << "  --require-channels-file PATH  Load required channels from a file\n"
+        << "  --max-regressions COUNT       Bound regressions versus the baseline\n"
+        << "  --margin-drop-percent 0-100   Emit predictive margin regression events\n\n"
+        << "Exit codes:\n"
+        << "  0  Gate passed or --fail-on never\n"
+        << "  1  MONITOR disposition met the configured failure policy\n"
+        << "  2  HOLD disposition met the configured failure policy\n"
+        << "  3  Invalid input, policy, option, or output destination\n";
+}
+
 int main(int argc, char* argv[]) {
+    if (argc == 2 && (std::string(argv[1]) == "--help" ||
+                      std::string(argv[1]) == "-h")) {
+        printHelp(std::cout);
+        return 0;
+    }
     if (argc == 2 && std::string(argv[1]) == "--version") {
         std::cout << "TelemetryGuard " << TELEMETRY_GUARD_VERSION << '\n';
         return 0;
@@ -741,19 +780,8 @@ int main(int argc, char* argv[]) {
                 return 3;
             }
         } else {
-            std::cerr << "Usage: telemetry_guard [--check-policy path] | "
-                         "[--csv path] [--baseline path] "
-                         "[--json | --ndjson | --prometheus | --events | --junit | "
-                         "--github-annotations | --html | --sarif | --report-csv] "
-                         "[--output path] "
-                         "[--fail-on monitor|hold|never] [--min-health-score 0-100] "
-                         "[--min-availability 0-100] "
-                         "[--min-channels count] "
-                         "[--require-channel name]... "
-                         "[--require-channels-file path] "
-                         "[--policy path] "
-                         "[--max-input-channels count] "
-                         "[--margin-drop-percent 0-100] [--max-regressions count]\n";
+            std::cerr << "Input error: unknown or incomplete option: "
+                      << argument << "\nRun telemetry_guard --help for usage.\n";
             return 3;
         }
     }

@@ -7,6 +7,7 @@ All scenarios are synthetic and contain no operational data.
 ## What it demonstrates
 
 - Defensive validation of telemetry values, timestamps, and channel configuration
+- Built-in `--help` reference for inputs, outputs, gates, and exit codes
 - Warning and critical limit evaluation with freshness-aware status classification
 - Stable per-channel diagnostic reason codes for root-cause automation
 - GO, MONITOR, and HOLD vehicle dispositions with script-friendly exit codes
@@ -68,6 +69,10 @@ cd build && cpack
 
 The install places the executable under `bin/` and project documentation under
 the platform's standard documentation directory.
+
+Run `telemetry_guard --help` (or `-h`) for a complete command reference. It
+lists every supported input, report format, deployment gate, and the stable
+exit-code contract used by CI pipelines.
 
 Every push and pull request also builds the production CPack distributions,
 verifies that both archives contain a runnable versioned CLI, and publishes the

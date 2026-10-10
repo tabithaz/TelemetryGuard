@@ -178,6 +178,9 @@ add_test(NAME sarif_output COMMAND ${CMAKE_COMMAND}
 add_test(NAME output_file COMMAND ${CMAKE_COMMAND}
     -DTELEMETRY_GUARD=$<TARGET_FILE:telemetry_guard>
     -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/output_file.cmake)
+add_test(NAME cli_help COMMAND ${CMAKE_COMMAND}
+    -DTELEMETRY_GUARD=$<TARGET_FILE:telemetry_guard>
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cli_help.cmake)
 add_test(NAME csv_report COMMAND ${CMAKE_COMMAND}
     -DTELEMETRY_GUARD=$<TARGET_FILE:telemetry_guard>
     -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/csv_report.cmake)
