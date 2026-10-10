@@ -1,5 +1,6 @@
 set(input_file "${CMAKE_CURRENT_BINARY_DIR}/output-file.csv")
 set(report_file "${CMAKE_CURRENT_BINARY_DIR}/telemetry-report.html")
+file(WRITE "${report_file}" "previous-report")
 file(WRITE "${input_file}"
     "channel,value,warning_min,warning_max,critical_min,critical_max,unit,age_seconds,warning_age_seconds,max_age_seconds\n"
     "Temperature,11,0,10,-2,12,C,0.2,1,2\n")
@@ -19,6 +20,10 @@ if(NOT report MATCHES "<!doctype html>" OR
    NOT report MATCHES "Temperature" OR
    NOT report MATCHES "MONITOR")
     message(FATAL_ERROR "Direct report file was incomplete: ${report}")
+endif()
+file(GLOB temporary_reports "${report_file}.tmp.*")
+if(temporary_reports)
+    message(FATAL_ERROR "Atomic report publishing left temporary files: ${temporary_reports}")
 endif()
 
 file(WRITE "${report_file}" "preserve-me")

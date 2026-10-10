@@ -1,5 +1,7 @@
 #include <algorithm>
+#include <chrono>
 #include <cmath>
+#include <filesystem>
 #include <iomanip>
 #include <fstream>
 #include <sstream>
@@ -903,8 +905,11 @@ int main(int argc, char* argv[]) {
 
     std::ofstream outputFile;
     std::streambuf* standardOutput = nullptr;
+    std::filesystem::path temporaryOutputPath;
     if (!outputPath.empty()) {
-        outputFile.open(outputPath, std::ios::out | std::ios::trunc);
+        temporaryOutputPath = outputPath + ".tmp." + std::to_string(
+            std::chrono::high_resolution_clock::now().time_since_epoch().count());
+        outputFile.open(temporaryOutputPath, std::ios::out | std::ios::trunc);
         if (!outputFile) {
             std::cerr << "Output error: cannot open file: " << outputPath << '\n';
             return 3;
@@ -1657,7 +1662,17 @@ int main(int argc, char* argv[]) {
         std::cout.rdbuf(standardOutput);
         outputFile.close();
         if (writeFailed || !outputFile) {
+            std::error_code cleanupError;
+            std::filesystem::remove(temporaryOutputPath, cleanupError);
             std::cerr << "Output error: cannot write file: " << outputPath << '\n';
+            return 3;
+        }
+        std::error_code publishError;
+        std::filesystem::rename(temporaryOutputPath, outputPath, publishError);
+        if (publishError) {
+            std::error_code cleanupError;
+            std::filesystem::remove(temporaryOutputPath, cleanupError);
+            std::cerr << "Output error: cannot publish file: " << outputPath << '\n';
             return 3;
         }
     }

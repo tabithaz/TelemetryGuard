@@ -22,6 +22,7 @@ All scenarios are synthetic and contain no operational data.
 - Standalone policy validation with normalized JSON for CI and GitOps preflight checks
 - Configurable input channel ceilings for bounded memory use in automation
 - Spreadsheet-safe CSV reports for analyst review and downstream pipelines
+- Atomic report-file publishing that prevents consumers from reading partial artifacts
 - Native GitHub Actions warnings and errors for degraded telemetry channels
 - Self-contained HTML health reports for review and attachment
 - SARIF 2.1.0 findings for standardized analysis and code-scanning pipelines
