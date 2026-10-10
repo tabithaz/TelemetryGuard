@@ -21,6 +21,7 @@ All scenarios are synthetic and contain no operational data.
 - Version-controlled policy files for reusable deployment acceptance criteria
 - Standalone policy validation with normalized JSON for CI and GitOps preflight checks
 - Configurable input channel ceilings for bounded memory use in automation
+- Streaming CSV row-size limits that bound memory use for files and standard input
 - Spreadsheet-safe CSV reports for analyst review and downstream pipelines
 - Atomic report-file publishing that prevents consumers from reading partial artifacts
 - Native GitHub Actions warnings and errors for degraded telemetry channels
@@ -161,6 +162,15 @@ over the limit fail atomically with exit code 3 before any report is emitted:
 
 ```bash
 ./build/telemetry_guard --csv readings.csv --max-input-channels 500 --json
+```
+
+Each CSV row is also limited to 65,536 bytes by default, preventing a malformed
+file or stdin producer from bypassing the channel ceiling with one oversized
+record. Use `--max-row-bytes` to enforce a tighter ingestion boundary; the same
+limit applies to current and baseline inputs:
+
+```bash
+./build/telemetry_guard --csv readings.csv --max-row-bytes 4096 --json
 ```
 
 Emit a standard JUnit XML report for CI systems that can publish test results:

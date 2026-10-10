@@ -94,6 +94,9 @@ add_test(NAME csv_channel_identity COMMAND ${CMAKE_COMMAND}
 add_test(NAME input_channel_limit COMMAND ${CMAKE_COMMAND}
     -DTELEMETRY_GUARD=$<TARGET_FILE:telemetry_guard>
     -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/input_channel_limit.cmake)
+add_test(NAME input_row_limit COMMAND ${CMAKE_COMMAND}
+    -DTELEMETRY_GUARD=$<TARGET_FILE:telemetry_guard>
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/input_row_limit.cmake)
 add_test(NAME quoted_csv_fields COMMAND ${CMAKE_COMMAND}
     -DTELEMETRY_GUARD=$<TARGET_FILE:telemetry_guard>
     -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/quoted_csv_fields.cmake)

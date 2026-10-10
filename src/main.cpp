@@ -279,17 +279,44 @@ std::vector<std::string> parseCsvRow(const std::string& line) {
     return cells;
 }
 
+bool readBoundedLine(std::istream& input, std::string& line,
+                     std::size_t maximumRowBytes) {
+    line.clear();
+    char character = '\0';
+    while (input.get(character)) {
+        if (character == '\n') return true;
+        if (line.size() >= maximumRowBytes)
+            throw std::length_error(
+                "row exceeds configured maximum of " +
+                std::to_string(maximumRowBytes) + " bytes");
+        line.push_back(character);
+    }
+    return !line.empty();
+}
+
 std::vector<TelemetryReading> readCsv(std::istream& input,
-                                      std::size_t maximumChannels) {
+                                      std::size_t maximumChannels,
+                                      std::size_t maximumRowBytes) {
     const std::string header = "channel,value,warning_min,warning_max,critical_min,critical_max,unit,age_seconds,warning_age_seconds,max_age_seconds";
     std::string line;
-    if (!std::getline(input, line)) throw std::runtime_error("invalid CSV header");
+    try {
+        if (!readBoundedLine(input, line, maximumRowBytes))
+            throw std::runtime_error("invalid CSV header");
+    } catch (const std::length_error& error) {
+        throw std::runtime_error(std::string("CSV header: ") + error.what());
+    }
     if (!line.empty() && line.back() == '\r') line.pop_back();
     if (line != header) throw std::runtime_error("invalid CSV header");
     std::vector<TelemetryReading> readings;
     std::set<std::string> channelNames;
     std::size_t lineNumber = 1;
-    while (std::getline(input, line)) {
+    while (true) {
+        try {
+            if (!readBoundedLine(input, line, maximumRowBytes)) break;
+        } catch (const std::length_error& error) {
+            throw std::runtime_error("CSV line " + std::to_string(lineNumber + 1) +
+                                     ": " + error.what());
+        }
         ++lineNumber;
         try {
             if (readings.size() >= maximumChannels)
@@ -320,11 +347,12 @@ std::vector<TelemetryReading> readCsv(std::istream& input,
 }
 
 std::vector<TelemetryReading> readCsvFile(const std::string& path,
-                                          std::size_t maximumChannels) {
-    if (path == "-") return readCsv(std::cin, maximumChannels);
+                                          std::size_t maximumChannels,
+                                          std::size_t maximumRowBytes) {
+    if (path == "-") return readCsv(std::cin, maximumChannels, maximumRowBytes);
     std::ifstream file(path);
     if (!file) throw std::runtime_error("cannot open input file: " + path);
-    return readCsv(file, maximumChannels);
+    return readCsv(file, maximumChannels, maximumRowBytes);
 }
 
 std::vector<std::string> readRequiredChannelsFile(const std::string& path) {
@@ -574,6 +602,7 @@ void printHelp(std::ostream& output) {
         << "  --csv PATH                    Read current telemetry CSV (use - for stdin)\n"
         << "  --baseline PATH               Compare against a baseline CSV\n"
         << "  --max-input-channels COUNT    Bound channels loaded per CSV (default: 10000)\n"
+        << "  --max-row-bytes BYTES         Bound each CSV row (default: 65536)\n"
         << "  --policy PATH                 Load a version-controlled gate policy\n"
         << "  --check-policy PATH           Validate and normalize a policy, then exit\n\n"
         << "Output (choose at most one):\n"
@@ -636,6 +665,8 @@ int main(int argc, char* argv[]) {
     std::optional<double> marginDropPercent;
     std::size_t maximumInputChannels = 10000;
     bool maximumInputChannelsProvided = false;
+    std::size_t maximumRowBytes = 65536;
+    bool maximumRowBytesProvided = false;
     std::vector<std::string> requiredChannels;
     std::string requiredChannelsPath;
     std::string policyPath;
@@ -781,6 +812,24 @@ int main(int argc, char* argv[]) {
                 std::cerr << "Input error: --max-input-channels must be a positive integer\n";
                 return 3;
             }
+        } else if (argument == "--max-row-bytes" &&
+                   !maximumRowBytesProvided && index + 1 < argc) {
+            const std::string value = argv[++index];
+            try {
+                if (value.empty() ||
+                    value.find_first_not_of("0123456789") != std::string::npos)
+                    throw std::invalid_argument("not an unsigned integer");
+                std::size_t consumed = 0;
+                const unsigned long long maximum = std::stoull(value, &consumed);
+                if (consumed != value.size() || maximum == 0 ||
+                    maximum > std::numeric_limits<std::size_t>::max())
+                    throw std::invalid_argument("out of range");
+                maximumRowBytes = static_cast<std::size_t>(maximum);
+                maximumRowBytesProvided = true;
+            } catch (const std::exception&) {
+                std::cerr << "Input error: --max-row-bytes must be a positive integer\n";
+                return 3;
+            }
         } else {
             std::cerr << "Input error: unknown or incomplete option: "
                       << argument << "\nUsage: run telemetry_guard --help.\n";
@@ -878,10 +927,10 @@ int main(int argc, char* argv[]) {
     std::map<std::string, TelemetryReading> baselineReadings;
     try {
         readings = csvPath.empty() ? sample :
-            readCsvFile(csvPath, maximumInputChannels);
+            readCsvFile(csvPath, maximumInputChannels, maximumRowBytes);
         if (!baselinePath.empty()) {
             const std::vector<TelemetryReading> baseline =
-                readCsvFile(baselinePath, maximumInputChannels);
+                readCsvFile(baselinePath, maximumInputChannels, maximumRowBytes);
             for (const auto& reading : baseline)
                 baselineReadings.emplace(reading.channel, reading);
             for (const auto& reading : baseline)
