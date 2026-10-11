@@ -180,6 +180,7 @@ add_test(NAME html_output COMMAND ${CMAKE_COMMAND}
     -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/html_output.cmake)
 add_test(NAME sarif_output COMMAND ${CMAKE_COMMAND}
     -DTELEMETRY_GUARD=$<TARGET_FILE:telemetry_guard>
+    -DEXPECTED_VERSION=${PROJECT_VERSION}
     -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/sarif_output.cmake)
 add_test(NAME output_file COMMAND ${CMAKE_COMMAND}
     -DTELEMETRY_GUARD=$<TARGET_FILE:telemetry_guard>

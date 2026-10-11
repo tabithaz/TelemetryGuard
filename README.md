@@ -28,6 +28,7 @@ All scenarios are synthetic and contain no operational data.
 - Native GitHub Actions warnings and errors for degraded telemetry channels
 - Self-contained HTML health reports for review and attachment
 - SARIF 2.1.0 findings for standardized analysis and code-scanning pipelines
+- Version-consistent report provenance tied to the packaged CLI release
 - Per-channel limit margins and portfolio-level minimum warning headroom
 - Small header-only diagnostic components with focused regression tests
 - Portable CMake builds and CI across GCC, Clang, and Apple Clang

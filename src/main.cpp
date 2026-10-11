@@ -1124,7 +1124,8 @@ int main(int argc, char* argv[]) {
     } else if (sarifOutput) {
         std::cout << "{\"$schema\":\"https://json.schemastore.org/sarif-2.1.0.json\","
                      "\"version\":\"2.1.0\",\"runs\":[{\"tool\":{\"driver\":{"
-                     "\"name\":\"TelemetryGuard\",\"version\":\"0.1.0\","
+                     "\"name\":\"TelemetryGuard\",\"version\":\""
+                  << TELEMETRY_GUARD_VERSION << "\","
                      "\"informationUri\":\"https://github.com/tabithaz/TelemetryGuard\","
                      "\"rules\":["
                      "{\"id\":\"TG001\",\"name\":\"WarningLimit\",\"shortDescription\":{\"text\":\"Telemetry value crossed a warning limit\"}},"
