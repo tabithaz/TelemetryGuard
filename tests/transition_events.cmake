@@ -18,6 +18,7 @@ if(NOT result EQUAL 0 OR NOT error STREQUAL "" OR NOT line_count EQUAL 3 OR
    NOT output MATCHES "\"transition\":\"recovery\"" OR
    output MATCHES "\"channel\":\"Voltage\"" OR
    NOT output MATCHES "\"type\":\"transition_summary\"" OR
+   NOT output MATCHES "\"tool_version\":\"0.2.0\"" OR
    NOT output MATCHES "\"regressions\":1" OR
    NOT output MATCHES "\"recoveries\":1" OR
    NOT output MATCHES "\"unchanged\":1")

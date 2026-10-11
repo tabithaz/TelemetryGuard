@@ -10,6 +10,7 @@ All scenarios are synthetic and contain no operational data.
 - Built-in `--help` reference for inputs, outputs, gates, and exit codes
 - Warning and critical limit evaluation with freshness-aware status classification
 - Stable per-channel diagnostic reason codes for root-cause automation
+- Version-stamped machine reports for release and incident traceability
 - GO, MONITOR, and HOLD vehicle dispositions with script-friendly exit codes
 - Baseline comparisons that identify channel status regressions and recoveries
 - Structured transition-event streams for alerting and incident pipelines
@@ -231,6 +232,8 @@ summary instead of the formatted report:
 Missing or non-finite values are represented as JSON `null`. The command keeps
 the same GO, MONITOR, HOLD, and input-error exit codes, which makes the JSON mode
 usable in CI checks and monitoring pipelines without parsing presentation text.
+JSON, NDJSON, transition-event, JUnit, Prometheus, and SARIF outputs include the
+compiled CLI version so stored reports remain traceable to their producer.
 Every channel also includes a stable `reason` such as
 `value_above_critical_maximum`, `age_above_maximum`, or `missing_value`, so
 automation can distinguish the cause of two channels with the same status.

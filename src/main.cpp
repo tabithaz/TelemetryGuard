@@ -1266,6 +1266,8 @@ int main(int argc, char* argv[]) {
                   << "\" failures=\"" << failureCount
                   << "\" errors=\"0\" skipped=\"0\">\n"
                   << "  <properties>\n"
+                  << "    <property name=\"tool_version\" value=\""
+                  << TELEMETRY_GUARD_VERSION << "\"/>\n"
                   << "    <property name=\"health_score\" value=\"" << healthScore
                   << "\"/>\n"
                   << "    <property name=\"health_band\" value=\""
@@ -1359,7 +1361,8 @@ int main(int argc, char* argv[]) {
             else std::cout << "null";
             std::cout << ",\"unit\":\"" << jsonEscape(reading.unit) << "\"}\n";
         }
-        std::cout << "{\"type\":\"transition_summary\",\"regressions\":"
+        std::cout << "{\"type\":\"transition_summary\",\"tool_version\":\""
+                  << TELEMETRY_GUARD_VERSION << "\",\"regressions\":"
                   << regressionCount << ",\"recoveries\":" << recoveryCount
                   << ",\"unchanged\":" << unchangedCount
                   << ",\"margin_regressions\":" << marginRegressionCount
@@ -1398,7 +1401,8 @@ int main(int argc, char* argv[]) {
                   << (regressionGateMet ? "true" : "false")
                   << ",\"disposition\":\"" << disposition << "\"}\n";
     } else if (jsonOutput) {
-        std::cout << "{\"channels\":[";
+        std::cout << "{\"tool\":{\"name\":\"TelemetryGuard\",\"version\":\""
+                  << TELEMETRY_GUARD_VERSION << "\"},\"channels\":[";
         for (std::size_t index = 0; index < readings.size(); ++index) {
             if (index > 0) std::cout << ',';
             const auto& reading = readings[index];
@@ -1516,7 +1520,9 @@ int main(int argc, char* argv[]) {
             else std::cout << "null";
             std::cout << "}\n";
         }
-        std::cout << "{\"type\":\"summary\",\"total_readings\":" << totalReadings
+        std::cout << "{\"type\":\"summary\",\"tool_version\":\""
+                  << TELEMETRY_GUARD_VERSION << "\",\"total_readings\":"
+                  << totalReadings
                   << ",\"nominal\":" << nominalCount
                   << ",\"warnings\":" << warningCount
                   << ",\"critical\":" << criticalCount
@@ -1572,7 +1578,11 @@ int main(int argc, char* argv[]) {
         else std::cout << "null";
         std::cout << ",\"disposition\":\"" << disposition << "\"}\n";
     } else if (prometheusOutput) {
-        std::cout << "# HELP telemetry_guard_health_score Composite telemetry health score.\n"
+        std::cout << "# HELP telemetry_guard_build_info TelemetryGuard build information.\n"
+                  << "# TYPE telemetry_guard_build_info gauge\n"
+                  << "telemetry_guard_build_info{version=\""
+                  << TELEMETRY_GUARD_VERSION << "\"} 1\n"
+                  << "# HELP telemetry_guard_health_score Composite telemetry health score.\n"
                   << "# TYPE telemetry_guard_health_score gauge\n"
                   << "telemetry_guard_health_score " << healthScore << '\n'
                   << "# HELP telemetry_guard_availability_percent Percentage of available channels.\n"

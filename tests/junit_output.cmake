@@ -18,6 +18,7 @@ endif()
 foreach(pattern
         "^<\\?xml version=\"1.0\" encoding=\"UTF-8\"\\?>"
         "<testsuite name=\"TelemetryGuard\" tests=\"3\" failures=\"2\" errors=\"0\" skipped=\"0\">"
+        "<property name=\"tool_version\" value=\"0.2.0\"/>"
         "name=\"Bus &amp; &lt;Primary&gt;\""
         "<failure type=\"WARNING\" message=\"Channel status: WARNING\">"
         "<failure type=\"STALE\" message=\"Channel status: STALE\">"

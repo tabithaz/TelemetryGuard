@@ -18,6 +18,7 @@ list(GET lines 3 summary_line)
 if(NOT first_line MATCHES "^\\{\"type\":\"channel\"" OR
    NOT first_line MATCHES "\"channel\":\"Altitude\"" OR
    NOT summary_line MATCHES "^\\{\"type\":\"summary\"" OR
+   NOT summary_line MATCHES "\"tool_version\":\"0.2.0\"" OR
    NOT summary_line MATCHES "\"disposition\":\"HOLD\"")
     message(FATAL_ERROR "NDJSON records are incomplete: ${output}")
 endif()

@@ -10,6 +10,8 @@ if(NOT result EQUAL 2)
 endif()
 
 foreach(expected
+        "# TYPE telemetry_guard_build_info gauge"
+        "telemetry_guard_build_info{version=\"0.2.0\"} 1"
         "# TYPE telemetry_guard_health_score gauge"
         "telemetry_guard_health_score 67"
         "telemetry_guard_availability_percent 66.7"

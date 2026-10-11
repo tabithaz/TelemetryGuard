@@ -10,6 +10,7 @@ if(NOT result EQUAL 2)
 endif()
 
 foreach(expected
+        "\"tool\":{\"name\":\"TelemetryGuard\",\"version\":\"0.2.0\"}"
         "\"channel\":\"Altitude\""
         "\"value\":null"
         "\"status\":\"NO DATA\""
