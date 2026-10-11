@@ -279,6 +279,12 @@ std::vector<std::string> parseCsvRow(const std::string& line) {
     return cells;
 }
 
+bool containsControlCharacter(const std::string& value) {
+    return std::any_of(value.begin(), value.end(), [](unsigned char character) {
+        return character < 0x20 || character == 0x7f;
+    });
+}
+
 bool readBoundedLine(std::istream& input, std::string& line,
                      std::size_t maximumRowBytes) {
     line.clear();
@@ -332,6 +338,10 @@ std::vector<TelemetryReading> readCsv(std::istream& input,
             if (cells[0].find_first_not_of(" \t") != 0 ||
                 cells[0].find_last_not_of(" \t") != cells[0].size() - 1)
                 throw std::invalid_argument("channel name has surrounding whitespace");
+            if (containsControlCharacter(cells[0]))
+                throw std::invalid_argument("channel name contains a control character");
+            if (containsControlCharacter(cells[6]))
+                throw std::invalid_argument("unit contains a control character");
             if (!channelNames.insert(cells[0]).second)
                 throw std::invalid_argument("duplicate channel: " + cells[0]);
             readings.push_back({cells[0], parseNumber(cells[1]), parseNumber(cells[2]),
@@ -371,6 +381,10 @@ std::vector<std::string> readRequiredChannelsFile(const std::string& path) {
             throw std::runtime_error("required channels file line " +
                 std::to_string(lineNumber) +
                 ": channel must be nonblank without surrounding whitespace");
+        if (containsControlCharacter(line))
+            throw std::runtime_error("required channels file line " +
+                std::to_string(lineNumber) +
+                ": channel contains a control character");
         channels.push_back(line);
     }
     if (file.bad()) throw std::runtime_error("failed while reading required channels file: " + path);
@@ -419,6 +433,9 @@ TelemetryPolicy readPolicyFile(const std::string& path) {
 
         try {
             if (key == "required_channel") {
+                if (containsControlCharacter(value))
+                    throw std::invalid_argument(
+                        "required channel contains a control character");
                 if (!requiredChannels.insert(value).second)
                     throw std::invalid_argument("duplicate required channel: " + value);
                 policy.requiredChannels.push_back(value);
@@ -745,6 +762,10 @@ int main(int argc, char* argv[]) {
                 channel.find_first_not_of(" \t") != 0 ||
                 channel.find_last_not_of(" \t") != channel.size() - 1) {
                 std::cerr << "Input error: --require-channel must be a nonblank channel name without surrounding whitespace\n";
+                return 3;
+            }
+            if (containsControlCharacter(channel)) {
+                std::cerr << "Input error: --require-channel cannot contain control characters\n";
                 return 3;
             }
             if (std::find(requiredChannels.begin(), requiredChannels.end(), channel) !=

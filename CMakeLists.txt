@@ -91,6 +91,9 @@ add_test(NAME csv_playback COMMAND ${CMAKE_COMMAND}
 add_test(NAME csv_channel_identity COMMAND ${CMAKE_COMMAND}
     -DTELEMETRY_GUARD=$<TARGET_FILE:telemetry_guard>
     -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/csv_channel_identity.cmake)
+add_test(NAME control_character_rejection COMMAND ${CMAKE_COMMAND}
+    -DTELEMETRY_GUARD=$<TARGET_FILE:telemetry_guard>
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/control_character_rejection.cmake)
 add_test(NAME input_channel_limit COMMAND ${CMAKE_COMMAND}
     -DTELEMETRY_GUARD=$<TARGET_FILE:telemetry_guard>
     -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/input_channel_limit.cmake)
