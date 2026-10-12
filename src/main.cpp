@@ -21,6 +21,8 @@
 #endif
 
 constexpr const char* REPORT_SCHEMA_VERSION = "1";
+constexpr std::size_t MAXIMUM_CONFIGURATION_ENTRIES = 10000;
+constexpr std::size_t MAXIMUM_CONFIGURATION_LINE_BYTES = 65536;
 
 struct TelemetryReading {
     std::string channel;
@@ -373,7 +375,13 @@ std::vector<std::string> readRequiredChannelsFile(const std::string& path) {
     std::vector<std::string> channels;
     std::string line;
     std::size_t lineNumber = 0;
-    while (std::getline(file, line)) {
+    while (true) {
+        try {
+            if (!readBoundedLine(file, line, MAXIMUM_CONFIGURATION_LINE_BYTES)) break;
+        } catch (const std::length_error& error) {
+            throw std::runtime_error("required channels file line " +
+                std::to_string(lineNumber + 1) + ": " + error.what());
+        }
         ++lineNumber;
         if (!line.empty() && line.back() == '\r') line.pop_back();
         if (line.empty() || line.front() == '#') continue;
@@ -387,6 +395,10 @@ std::vector<std::string> readRequiredChannelsFile(const std::string& path) {
             throw std::runtime_error("required channels file line " +
                 std::to_string(lineNumber) +
                 ": channel contains a control character");
+        if (channels.size() >= MAXIMUM_CONFIGURATION_ENTRIES)
+            throw std::runtime_error("required channels file line " +
+                std::to_string(lineNumber) + ": entry count exceeds maximum of " +
+                std::to_string(MAXIMUM_CONFIGURATION_ENTRIES));
         channels.push_back(line);
     }
     if (file.bad()) throw std::runtime_error("failed while reading required channels file: " + path);
@@ -418,11 +430,23 @@ TelemetryPolicy readPolicyFile(const std::string& path) {
     std::set<std::string> requiredChannels;
     std::string line;
     std::size_t lineNumber = 0;
-    while (std::getline(file, line)) {
+    std::size_t entryCount = 0;
+    while (true) {
+        try {
+            if (!readBoundedLine(file, line, MAXIMUM_CONFIGURATION_LINE_BYTES)) break;
+        } catch (const std::length_error& error) {
+            throw std::runtime_error("policy file line " +
+                std::to_string(lineNumber + 1) + ": " + error.what());
+        }
         ++lineNumber;
         if (!line.empty() && line.back() == '\r') line.pop_back();
         const std::string normalized = trimPolicyValue(line);
         if (normalized.empty() || normalized.front() == '#') continue;
+        if (entryCount >= MAXIMUM_CONFIGURATION_ENTRIES)
+            throw std::runtime_error("policy file line " +
+                std::to_string(lineNumber) + ": entry count exceeds maximum of " +
+                std::to_string(MAXIMUM_CONFIGURATION_ENTRIES));
+        ++entryCount;
         const std::size_t separator = normalized.find('=');
         if (separator == std::string::npos)
             throw std::runtime_error("policy file line " + std::to_string(lineNumber) +

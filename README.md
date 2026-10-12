@@ -23,6 +23,7 @@ All scenarios are synthetic and contain no operational data.
 - Standalone policy validation with normalized JSON for CI and GitOps preflight checks
 - Configurable input channel ceilings for bounded memory use in automation
 - Streaming CSV row-size limits that bound memory use for files and standard input
+- Bounded policy and required-channel configuration ingestion
 - Control-character rejection that prevents terminal and automation-log injection
 - Spreadsheet-safe CSV reports for analyst review and downstream pipelines
 - Atomic report-file publishing that prevents consumers from reading partial artifacts
@@ -120,6 +121,9 @@ field returns exit code 3 with a line number; GO, MONITOR, and HOLD still return
 Channel names must be unique and cannot be blank or padded with whitespace;
 channel names, units, and required-channel policies also cannot contain ASCII
 control characters. Invalid input is rejected before any report or metrics are emitted.
+Policy and required-channel configuration lines are limited to 65,536 bytes,
+and each file accepts at most 10,000 active entries. Oversized configuration is
+rejected before telemetry evaluation or report output.
 
 Compare a current telemetry snapshot with a previous snapshot using `--baseline`.
 Both files must contain the same channel identities. Human, JSON, NDJSON, and
