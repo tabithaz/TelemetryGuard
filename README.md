@@ -27,6 +27,7 @@ All scenarios are synthetic and contain no operational data.
 - Control-character rejection that prevents terminal and automation-log injection
 - Spreadsheet-safe CSV reports for analyst review and downstream pipelines
 - Atomic report-file publishing that prevents consumers from reading partial artifacts
+- Output path conflict detection that protects telemetry and policy inputs
 - Native GitHub Actions warnings and errors for degraded telemetry channels
 - Self-contained HTML health reports for review and attachment
 - SARIF 2.1.0 findings for standardized analysis and code-scanning pipelines

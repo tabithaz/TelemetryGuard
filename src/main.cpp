@@ -12,6 +12,7 @@
 #include <optional>
 #include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "limit_margin.hpp"
@@ -633,6 +634,18 @@ std::string githubCommandEscape(const std::string& value, bool property) {
     return escaped.str();
 }
 
+bool pathsReferToSameFile(const std::string& left, const std::string& right) {
+    if (left.empty() || right.empty() || left == "-" || right == "-") return false;
+    std::error_code error;
+    const bool equivalent = std::filesystem::equivalent(left, right, error);
+    if (!error) return equivalent;
+    error.clear();
+    const std::filesystem::path absoluteLeft = std::filesystem::absolute(left, error);
+    if (error) return false;
+    const std::filesystem::path absoluteRight = std::filesystem::absolute(right, error);
+    return !error && absoluteLeft.lexically_normal() == absoluteRight.lexically_normal();
+}
+
 void printHelp(std::ostream& output) {
     output
         << "TelemetryGuard " << TELEMETRY_GUARD_VERSION << "\n\n"
@@ -880,6 +893,17 @@ int main(int argc, char* argv[]) {
         } else {
             std::cerr << "Input error: unknown or incomplete option: "
                       << argument << "\nUsage: run telemetry_guard --help.\n";
+            return 3;
+        }
+    }
+    for (const auto& input : std::vector<std::pair<std::string, std::string>>{
+             {"current CSV", csvPath},
+             {"baseline CSV", baselinePath},
+             {"policy", policyPath},
+             {"required-channel manifest", requiredChannelsPath}}) {
+        if (pathsReferToSameFile(outputPath, input.second)) {
+            std::cerr << "Output error: --output must not replace the "
+                      << input.first << " input\n";
             return 3;
         }
     }
