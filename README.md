@@ -233,7 +233,9 @@ Missing or non-finite values are represented as JSON `null`. The command keeps
 the same GO, MONITOR, HOLD, and input-error exit codes, which makes the JSON mode
 usable in CI checks and monitoring pipelines without parsing presentation text.
 JSON, NDJSON, transition-event, JUnit, Prometheus, and SARIF outputs include the
-compiled CLI version so stored reports remain traceable to their producer.
+compiled CLI version so stored reports remain traceable to their producer. They
+also publish report schema version `1`, allowing downstream parsers and
+dashboards to reject or migrate incompatible report shapes explicitly.
 Every channel also includes a stable `reason` such as
 `value_above_critical_maximum`, `age_above_maximum`, or `missing_value`, so
 automation can distinguish the cause of two channels with the same status.

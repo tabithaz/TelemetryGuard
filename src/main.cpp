@@ -20,6 +20,8 @@
 #define TELEMETRY_GUARD_VERSION "development"
 #endif
 
+constexpr const char* REPORT_SCHEMA_VERSION = "1";
+
 struct TelemetryReading {
     std::string channel;
     double value;
@@ -1135,7 +1137,8 @@ int main(int argc, char* argv[]) {
                      "{\"id\":\"TG005\",\"name\":\"MissingData\",\"shortDescription\":{\"text\":\"Telemetry data is missing\"}},"
                      "{\"id\":\"TG006\",\"name\":\"InvalidTimestamp\",\"shortDescription\":{\"text\":\"Telemetry timestamp is invalid\"}},"
                      "{\"id\":\"TG007\",\"name\":\"InvalidConfiguration\",\"shortDescription\":{\"text\":\"Telemetry limits or freshness configuration is invalid\"}}]}},";
-        std::cout << "\"automationDetails\":{\"id\":\"TelemetryGuard/"
+        std::cout << "\"properties\":{\"reportSchemaVersion\":\""
+                  << REPORT_SCHEMA_VERSION << "\"},\"automationDetails\":{\"id\":\"TelemetryGuard/"
                   << jsonEscape(disposition) << "\"},\"invocations\":[{"
                   << "\"executionSuccessful\":true,\"exitCode\":"
                   << policyExitCode(disposition, failOn) << "}],\"results\":[";
@@ -1268,6 +1271,8 @@ int main(int argc, char* argv[]) {
                   << "  <properties>\n"
                   << "    <property name=\"tool_version\" value=\""
                   << TELEMETRY_GUARD_VERSION << "\"/>\n"
+                  << "    <property name=\"report_schema_version\" value=\""
+                  << REPORT_SCHEMA_VERSION << "\"/>\n"
                   << "    <property name=\"health_score\" value=\"" << healthScore
                   << "\"/>\n"
                   << "    <property name=\"health_band\" value=\""
@@ -1325,7 +1330,8 @@ int main(int argc, char* argv[]) {
             const int currentPriority = statusPriority(statuses[index]);
             const int previousPriority = statusPriority(previous);
             if (currentPriority != previousPriority) {
-                std::cout << "{\"type\":\"status_transition\",\"transition\":\""
+                std::cout << "{\"type\":\"status_transition\",\"report_schema_version\":\""
+                          << REPORT_SCHEMA_VERSION << "\",\"transition\":\""
                           << (currentPriority > previousPriority ? "regression" : "recovery")
                           << "\",\"channel\":\"" << jsonEscape(reading.channel)
                           << "\",\"previous_status\":\"" << statusLabel(previous)
@@ -1348,7 +1354,8 @@ int main(int argc, char* argv[]) {
                                 margins[index]->warningHeadroomPercent;
             if (drop < *marginDropPercent) continue;
             ++marginRegressionCount;
-            std::cout << "{\"type\":\"margin_regression\",\"channel\":\""
+            std::cout << "{\"type\":\"margin_regression\",\"report_schema_version\":\""
+                      << REPORT_SCHEMA_VERSION << "\",\"channel\":\""
                       << jsonEscape(reading.channel) << "\",\"status\":\""
                       << statusLabel(statuses[index]) << "\",\"reason\":\""
                       << diagnosticReason(reading, statuses[index])
@@ -1362,7 +1369,8 @@ int main(int argc, char* argv[]) {
             std::cout << ",\"unit\":\"" << jsonEscape(reading.unit) << "\"}\n";
         }
         std::cout << "{\"type\":\"transition_summary\",\"tool_version\":\""
-                  << TELEMETRY_GUARD_VERSION << "\",\"regressions\":"
+                  << TELEMETRY_GUARD_VERSION << "\",\"report_schema_version\":\""
+                  << REPORT_SCHEMA_VERSION << "\",\"regressions\":"
                   << regressionCount << ",\"recoveries\":" << recoveryCount
                   << ",\"unchanged\":" << unchangedCount
                   << ",\"margin_regressions\":" << marginRegressionCount
@@ -1401,7 +1409,8 @@ int main(int argc, char* argv[]) {
                   << (regressionGateMet ? "true" : "false")
                   << ",\"disposition\":\"" << disposition << "\"}\n";
     } else if (jsonOutput) {
-        std::cout << "{\"tool\":{\"name\":\"TelemetryGuard\",\"version\":\""
+        std::cout << "{\"report_schema_version\":\"" << REPORT_SCHEMA_VERSION
+                  << "\",\"tool\":{\"name\":\"TelemetryGuard\",\"version\":\""
                   << TELEMETRY_GUARD_VERSION << "\"},\"channels\":[";
         for (std::size_t index = 0; index < readings.size(); ++index) {
             if (index > 0) std::cout << ',';
@@ -1492,7 +1501,8 @@ int main(int argc, char* argv[]) {
     } else if (ndjsonOutput) {
         for (std::size_t index = 0; index < readings.size(); ++index) {
             const auto& reading = readings[index];
-            std::cout << "{\"type\":\"channel\",\"channel\":\""
+            std::cout << "{\"type\":\"channel\",\"report_schema_version\":\""
+                      << REPORT_SCHEMA_VERSION << "\",\"channel\":\""
                       << jsonEscape(reading.channel) << "\",\"value\":";
             if (std::isfinite(reading.value)) std::cout << reading.value;
             else std::cout << "null";
@@ -1521,7 +1531,8 @@ int main(int argc, char* argv[]) {
             std::cout << "}\n";
         }
         std::cout << "{\"type\":\"summary\",\"tool_version\":\""
-                  << TELEMETRY_GUARD_VERSION << "\",\"total_readings\":"
+                  << TELEMETRY_GUARD_VERSION << "\",\"report_schema_version\":\""
+                  << REPORT_SCHEMA_VERSION << "\",\"total_readings\":"
                   << totalReadings
                   << ",\"nominal\":" << nominalCount
                   << ",\"warnings\":" << warningCount
@@ -1581,7 +1592,8 @@ int main(int argc, char* argv[]) {
         std::cout << "# HELP telemetry_guard_build_info TelemetryGuard build information.\n"
                   << "# TYPE telemetry_guard_build_info gauge\n"
                   << "telemetry_guard_build_info{version=\""
-                  << TELEMETRY_GUARD_VERSION << "\"} 1\n"
+                  << TELEMETRY_GUARD_VERSION << "\",report_schema_version=\""
+                  << REPORT_SCHEMA_VERSION << "\"} 1\n"
                   << "# HELP telemetry_guard_health_score Composite telemetry health score.\n"
                   << "# TYPE telemetry_guard_health_score gauge\n"
                   << "telemetry_guard_health_score " << healthScore << '\n'

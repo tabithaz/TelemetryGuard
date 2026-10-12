@@ -23,6 +23,7 @@ foreach(expected
         "\"version\":\"2.1.0\""
         "\"name\":\"TelemetryGuard\""
         "\"name\":\"TelemetryGuard\",\"version\":\"${EXPECTED_VERSION}\""
+        "\"properties\":{\"reportSchemaVersion\":\"1\"}"
         "\"automationDetails\":{\"id\":\"TelemetryGuard/HOLD\"}"
         "\"ruleId\":\"TG001\",\"level\":\"warning\""
         "\"ruleId\":\"TG005\",\"level\":\"error\""
