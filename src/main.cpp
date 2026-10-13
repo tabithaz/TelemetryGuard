@@ -653,6 +653,7 @@ void printHelp(std::ostream& output) {
         << "Usage:\n"
         << "  telemetry_guard [options]\n"
         << "  telemetry_guard --check-policy PATH\n"
+        << "  telemetry_guard --validate-input --csv PATH [input options]\n"
         << "  telemetry_guard --version\n\n"
         << "Input:\n"
         << "  --csv PATH                    Read current telemetry CSV (use - for stdin)\n"
@@ -660,7 +661,8 @@ void printHelp(std::ostream& output) {
         << "  --max-input-channels COUNT    Bound channels loaded per CSV (default: 10000)\n"
         << "  --max-row-bytes BYTES         Bound each CSV row (default: 65536)\n"
         << "  --policy PATH                 Load a version-controlled gate policy\n"
-        << "  --check-policy PATH           Validate and normalize a policy, then exit\n\n"
+        << "  --check-policy PATH           Validate and normalize a policy, then exit\n"
+        << "  --validate-input              Validate the full input contract, then exit\n\n"
         << "Output (choose at most one):\n"
         << "  --json | --ndjson | --prometheus | --events | --junit\n"
         << "  --github-annotations | --html | --sarif | --report-csv\n"
@@ -709,6 +711,7 @@ int main(int argc, char* argv[]) {
     bool htmlOutput = false;
     bool sarifOutput = false;
     bool csvReportOutput = false;
+    bool validateInput = false;
     std::string csvPath;
     std::string baselinePath;
     std::string outputPath;
@@ -746,6 +749,8 @@ int main(int argc, char* argv[]) {
             sarifOutput = true;
         } else if (argument == "--report-csv" && !csvReportOutput) {
             csvReportOutput = true;
+        } else if (argument == "--validate-input" && !validateInput) {
+            validateInput = true;
         } else if (argument == "--csv" && csvPath.empty() && index + 1 < argc) {
             csvPath = argv[++index];
         } else if (argument == "--baseline" && baselinePath.empty() && index + 1 < argc) {
@@ -939,7 +944,8 @@ int main(int argc, char* argv[]) {
                             static_cast<int>(githubOutput) +
                             static_cast<int>(htmlOutput) +
                             static_cast<int>(sarifOutput) +
-                            static_cast<int>(csvReportOutput);
+                            static_cast<int>(csvReportOutput) +
+                            static_cast<int>(validateInput);
     if (outputModes > 1) {
         std::cerr << "Input error: output modes are mutually exclusive\n";
         return 3;
@@ -962,6 +968,14 @@ int main(int argc, char* argv[]) {
     }
     if (maximumRegressions.has_value() && baselinePath.empty()) {
         std::cerr << "Input error: --max-regressions requires --baseline\n";
+        return 3;
+    }
+    if (validateInput && csvPath.empty()) {
+        std::cerr << "Input error: --validate-input requires --csv\n";
+        return 3;
+    }
+    if (validateInput && !outputPath.empty()) {
+        std::cerr << "Input error: --validate-input writes its summary to standard output\n";
         return 3;
     }
     if (!requiredChannelsPath.empty()) {
@@ -1021,6 +1035,31 @@ int main(int argc, char* argv[]) {
     } catch (const std::exception& error) {
         std::cerr << "Input error: " << error.what() << '\n';
         return 3;
+    }
+
+    if (validateInput) {
+        std::set<std::string> observedChannels;
+        for (const auto& reading : readings)
+            observedChannels.insert(reading.channel);
+        std::vector<std::string> missingRequiredChannels;
+        for (const auto& channel : requiredChannels) {
+            if (observedChannels.find(channel) == observedChannels.end())
+                missingRequiredChannels.push_back(channel);
+        }
+        if (!missingRequiredChannels.empty()) {
+            std::cerr << "Input error: missing required channel";
+            if (missingRequiredChannels.size() > 1) std::cerr << 's';
+            std::cerr << ':';
+            for (const auto& channel : missingRequiredChannels)
+                std::cerr << ' ' << channel;
+            std::cerr << '\n';
+            return 3;
+        }
+        std::cout << "{\"schema_version\":1,\"valid\":true,\"channels\":"
+                  << readings.size() << ",\"baseline_channels\":"
+                  << baselineStatuses.size() << ",\"required_channels\":"
+                  << requiredChannels.size() << "}\n";
+        return 0;
     }
 
     std::ofstream outputFile;

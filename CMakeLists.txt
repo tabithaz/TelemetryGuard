@@ -192,6 +192,9 @@ add_test(NAME output_file COMMAND ${CMAKE_COMMAND}
 add_test(NAME output_path_conflicts COMMAND ${CMAKE_COMMAND}
     -DTELEMETRY_GUARD=$<TARGET_FILE:telemetry_guard>
     -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/output_path_conflicts.cmake)
+add_test(NAME input_validation COMMAND ${CMAKE_COMMAND}
+    -DTELEMETRY_GUARD=$<TARGET_FILE:telemetry_guard>
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/input_validation.cmake)
 add_test(NAME cli_help COMMAND ${CMAKE_COMMAND}
     -DTELEMETRY_GUARD=$<TARGET_FILE:telemetry_guard>
     -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cli_help.cmake)

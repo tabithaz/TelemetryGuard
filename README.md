@@ -21,6 +21,7 @@ All scenarios are synthetic and contain no operational data.
 - Required-channel identity gates that catch missing mission-critical signals
 - Version-controlled policy files for reusable deployment acceptance criteria
 - Standalone policy validation with normalized JSON for CI and GitOps preflight checks
+- Full input-contract preflight for CSV, baseline, policy, and required channels
 - Configurable input channel ceilings for bounded memory use in automation
 - Streaming CSV row-size limits that bound memory use for files and standard input
 - Bounded policy and required-channel configuration ingestion
@@ -125,6 +126,16 @@ control characters. Invalid input is rejected before any report or metrics are e
 Policy and required-channel configuration lines are limited to 65,536 bytes,
 and each file accepts at most 10,000 active entries. Oversized configuration is
 rejected before telemetry evaluation or report output.
+
+Validate an entire input contract without running health gates or producing a
+report. `--validate-input` checks CSV structure and limits, baseline
+compatibility, policy syntax, and required-channel presence, then emits a
+schema-versioned JSON summary for CI preflight jobs:
+
+```bash
+./build/telemetry_guard --validate-input --csv examples/readings.csv \
+  --policy examples/mission-critical.policy
+```
 
 Compare a current telemetry snapshot with a previous snapshot using `--baseline`.
 Both files must contain the same channel identities. Human, JSON, NDJSON, and
