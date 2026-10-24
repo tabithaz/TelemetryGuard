@@ -22,7 +22,10 @@ inline GapTimingReport analyze_gap_timing(
     if (timestamps.size() < 2) {
         throw std::invalid_argument("at least two timestamps are required");
     }
-    if (expected_interval_seconds <= 0.0 || gap_multiplier <= 1.0 ||
+    if (!std::isfinite(expected_interval_seconds) ||
+        !std::isfinite(gap_multiplier) ||
+        !std::isfinite(degraded_gap_rate_percent) ||
+        expected_interval_seconds <= 0.0 || gap_multiplier <= 1.0 ||
         degraded_gap_rate_percent < 0.0 || degraded_gap_rate_percent > 100.0) {
         throw std::invalid_argument("invalid gap timing settings");
     }
@@ -31,6 +34,9 @@ inline GapTimingReport analyze_gap_timing(
     double maximum_interval = 0.0;
     std::size_t gap_count = 0;
     const double gap_threshold = expected_interval_seconds * gap_multiplier;
+    if (!std::isfinite(gap_threshold)) {
+        throw std::invalid_argument("gap threshold must be finite");
+    }
 
     for (std::size_t i = 1; i < timestamps.size(); ++i) {
         if (!std::isfinite(timestamps[i]) || !std::isfinite(timestamps[i - 1]) ||
@@ -38,6 +44,9 @@ inline GapTimingReport analyze_gap_timing(
             throw std::invalid_argument("timestamps must be finite and strictly increasing");
         }
         const double interval = timestamps[i] - timestamps[i - 1];
+        if (!std::isfinite(interval) || !std::isfinite(interval_sum + interval)) {
+            throw std::invalid_argument("timestamp intervals must have a finite sum");
+        }
         interval_sum += interval;
         maximum_interval = std::max(maximum_interval, interval);
         if (interval > gap_threshold) {
