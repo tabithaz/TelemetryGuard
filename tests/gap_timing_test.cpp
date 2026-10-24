@@ -1,5 +1,6 @@
 #include "../src/gap_timing.hpp"
 
+#include <limits>
 #include <stdexcept>
 
 int main() {
@@ -22,6 +23,34 @@ int main() {
         analyze_gap_timing({0.0}, 1.0);
         return 5;
     } catch (const std::invalid_argument&) {
+    }
+
+
+    const double nan = std::numeric_limits<double>::quiet_NaN();
+    const double infinity = std::numeric_limits<double>::infinity();
+    const double maximum = std::numeric_limits<double>::max();
+    const auto rejects = [](auto&& check) {
+        try {
+            check();
+        } catch (const std::invalid_argument&) {
+            return true;
+        }
+        return false;
+    };
+
+    if (!rejects([&] { analyze_gap_timing({0.0, 1.0}, nan); }) ||
+        !rejects([&] { analyze_gap_timing({0.0, 1.0}, infinity); }) ||
+        !rejects([&] { analyze_gap_timing({0.0, 1.0}, 1.0, nan); }) ||
+        !rejects([&] { analyze_gap_timing({0.0, 1.0}, 1.0, infinity); }) ||
+        !rejects([&] { analyze_gap_timing({0.0, 1.0}, 1.0, 2.0, nan); }) ||
+        !rejects([&] { analyze_gap_timing({0.0, 1.0}, 1.0, 2.0, infinity); })) {
+        return 6;
+    }
+
+    if (!rejects([&] { analyze_gap_timing({0.0, 1.0}, maximum, 2.0); }) ||
+        !rejects([&] { analyze_gap_timing({-maximum, maximum}, 1.0); }) ||
+        !rejects([&] { analyze_gap_timing({-maximum * 0.75, 0.0, maximum * 0.75}, 1.0); })) {
+        return 7;
     }
 
     return 0;
