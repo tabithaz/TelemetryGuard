@@ -54,5 +54,26 @@ int main() {
     } catch (const std::invalid_argument&) {
     }
 
+    const double max_value = std::numeric_limits<double>::max();
+    try {
+        telemetry::analyze_rate_of_change(-max_value, max_value, 2.0, 1.0);
+        std::cerr << "overflowing telemetry difference should be rejected\n";
+        return 1;
+    } catch (const std::overflow_error&) {
+    }
+
+    try {
+        telemetry::analyze_rate_of_change(0.0, max_value, 0.5, 1.0);
+        std::cerr << "overflowing rate should be rejected\n";
+        return 1;
+    } catch (const std::overflow_error&) {
+    }
+
+    const auto finite_large = telemetry::analyze_rate_of_change(0.0, max_value, max_value, 1.0);
+    if (!close_enough(finite_large.per_second, 1.0) || !finite_large.rapid_change) {
+        std::cerr << "large but finite rate should remain valid\n";
+        return 1;
+    }
+
     return 0;
 }
