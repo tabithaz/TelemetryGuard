@@ -28,7 +28,14 @@ inline RateOfChange analyze_rate_of_change(
         throw std::invalid_argument("rapid change threshold must be finite and non-negative");
     }
 
-    const double rate = (current_value - previous_value) / elapsed_seconds;
+    const double delta = current_value - previous_value;
+    if (!std::isfinite(delta)) {
+        throw std::overflow_error("telemetry value difference exceeds finite range");
+    }
+    const double rate = delta / elapsed_seconds;
+    if (!std::isfinite(rate)) {
+        throw std::overflow_error("rate of change exceeds finite range");
+    }
     const double absolute_rate = std::abs(rate);
     return RateOfChange{
         rate,
