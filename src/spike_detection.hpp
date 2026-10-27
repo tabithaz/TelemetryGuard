@@ -46,7 +46,12 @@ inline SpikeAnalysis analyze_spikes(
         }
     }
 
-    const double center = median_of(values);
+    std::vector<double> sorted_values;
+    sorted_values.reserve(values.size());
+    for (double value : values) {
+        sorted_values.push_back(value);
+    }
+    const double center = median_of(std::move(sorted_values));
     std::vector<double> deviations;
     deviations.reserve(values.size());
     for (double value : values) {
