@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstddef>
 #include <stdexcept>
+#include <utility>
 #include <vector>
 
 struct SpikeAnalysis {
@@ -34,7 +35,9 @@ inline SpikeAnalysis analyze_spikes(
     if (values.size() < 3) {
         throw std::invalid_argument("at least three samples are required");
     }
-    if (threshold <= 0.0 || degraded_percent < 0.0 || degraded_percent > 100.0) {
+    if (!std::isfinite(threshold) || threshold <= 0.0 ||
+        !std::isfinite(degraded_percent) || degraded_percent < 0.0 ||
+        degraded_percent > 100.0) {
         throw std::invalid_argument("invalid spike detection settings");
     }
     for (double value : values) {
@@ -49,7 +52,7 @@ inline SpikeAnalysis analyze_spikes(
     for (double value : values) {
         deviations.push_back(std::fabs(value - center));
     }
-    const double mad = median_of(deviations);
+    const double mad = median_of(std::move(deviations));
 
     std::size_t spikes = 0;
     if (mad > 0.0) {
