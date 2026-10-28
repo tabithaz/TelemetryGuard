@@ -38,6 +38,24 @@ int main() {
     } catch (const std::invalid_argument&) {
     }
 
+    const double large = 1e308;
+    const auto large_nominal = analyze_jitter({-large, 0.0, large}, large, 0.0);
+    if (!std::isfinite(large_nominal.mean_interval_ms) ||
+        large_nominal.mean_interval_ms != large ||
+        large_nominal.mean_absolute_jitter_ms != 0.0 || large_nominal.degraded) return 7;
+
+    const auto large_jitter = analyze_jitter({-large, 0.0, large}, 1.0, 0.0);
+    if (!std::isfinite(large_jitter.mean_absolute_jitter_ms) ||
+        large_jitter.mean_absolute_jitter_ms != large ||
+        large_jitter.max_jitter_ms != large || !large_jitter.degraded) return 8;
+
+    try {
+        const double maximum = std::numeric_limits<double>::max();
+        (void)analyze_jitter({-maximum, maximum}, 1.0, 0.0);
+        return 9;
+    } catch (const std::overflow_error&) {
+    }
+
     std::cout << "jitter analysis checks passed\n";
     return 0;
 }
