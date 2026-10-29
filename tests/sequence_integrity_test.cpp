@@ -87,5 +87,26 @@ int main() {
     } catch (const std::invalid_argument&) {
     }
 
+    const auto max_sequence = std::numeric_limits<std::uint64_t>::max();
+    const auto full_span = analyze_sequence_integrity({0, max_sequence});
+    if (!full_span.degraded || !std::isfinite(full_span.loss_percent) ||
+        full_span.loss_percent < 99.0 || full_span.loss_percent > 100.0) {
+        std::cerr << "full-range packet loss must not wrap expected count\n";
+        return 1;
+    }
+
+    const auto full_span_with_tail = analyze_sequence_integrity({0, max_sequence - 1, max_sequence});
+    if (!full_span_with_tail.degraded || full_span_with_tail.loss_percent < 99.0 ||
+        full_span_with_tail.loss_percent > 100.0 || full_span_with_tail.gap_events != 1) {
+        std::cerr << "full-range packet loss with contiguous tail was misclassified\n";
+        return 1;
+    }
+
+    const auto near_max_nominal = analyze_sequence_integrity({max_sequence - 2, max_sequence - 1, max_sequence});
+    if (near_max_nominal.degraded || near_max_nominal.loss_percent != 0.0) {
+        std::cerr << "contiguous high sequence numbers must remain nominal\n";
+        return 1;
+    }
+
     return 0;
 }

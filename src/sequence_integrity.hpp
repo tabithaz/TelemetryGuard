@@ -49,7 +49,8 @@ inline SequenceIntegrity analyze_sequence_integrity(
         largest_gap = std::max(largest_gap, gap);
     }
 
-    const std::size_t expected = sequence_numbers.size() + missing;
+    const long double expected = static_cast<long double>(sequence_numbers.size()) +
+        static_cast<long double>(missing);
     const double average_gap = gap_events == 0
         ? 0.0
         : static_cast<double>(missing) / static_cast<double>(gap_events);
@@ -65,9 +66,8 @@ inline SequenceIntegrity analyze_sequence_integrity(
     const double burst_loss_percent = missing == 0
         ? 0.0
         : (static_cast<double>(largest_gap) / static_cast<double>(missing)) * 100.0;
-    const double loss_percent = expected == 0
-        ? 0.0
-        : (static_cast<double>(missing) / static_cast<double>(expected)) * 100.0;
+    const double loss_percent = static_cast<double>(
+        (static_cast<long double>(missing) / expected) * 100.0L);
 
     return {
         sequence_numbers.size(),
