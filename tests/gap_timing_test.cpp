@@ -1,5 +1,6 @@
 #include "../src/gap_timing.hpp"
 
+#include <cmath>
 #include <limits>
 #include <stdexcept>
 
@@ -48,9 +49,24 @@ int main() {
     }
 
     if (!rejects([&] { analyze_gap_timing({0.0, 1.0}, maximum, 2.0); }) ||
-        !rejects([&] { analyze_gap_timing({-maximum, maximum}, 1.0); }) ||
-        !rejects([&] { analyze_gap_timing({-maximum * 0.75, 0.0, maximum * 0.75}, 1.0); })) {
+        !rejects([&] { analyze_gap_timing({-maximum, maximum}, 1.0); })) {
         return 7;
+    }
+
+    const double large_interval = maximum * 0.75;
+    const auto large = analyze_gap_timing({-large_interval, 0.0, large_interval}, 1.0);
+    if (!std::isfinite(large.mean_interval_seconds) ||
+        std::abs(large.mean_interval_seconds / large_interval - 1.0) > 1e-12 ||
+        large.maximum_interval_seconds != large_interval ||
+        large.gap_count != 2 || large.gap_rate_percent != 100.0 || !large.degraded) {
+        return 8;
+    }
+
+    const auto mixed = analyze_gap_timing({-large_interval, 0.0, maximum * 0.5}, 1.0);
+    if (!std::isfinite(mixed.mean_interval_seconds) ||
+        std::abs(mixed.mean_interval_seconds / maximum - 0.625) > 1e-12 ||
+        mixed.maximum_interval_seconds != large_interval) {
+        return 9;
     }
 
     return 0;
