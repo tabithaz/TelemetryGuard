@@ -71,6 +71,31 @@ int main() {
     }
     require(non_finite_tolerance_rejected, "non-finite tolerance must be rejected");
 
+    const double max_value = std::numeric_limits<double>::max();
+    const auto large_differences = analyze_sensor_agreement(
+        {max_value, max_value}, {0.0, 0.0}, max_value);
+    require(std::isfinite(large_differences.mean_absolute_difference) &&
+                large_differences.mean_absolute_difference == max_value,
+            "mean of large finite differences must remain finite");
+    require(large_differences.max_absolute_difference == max_value &&
+                !large_differences.degraded,
+            "large differences at tolerance must not be classified as disagreements");
+
+    const auto mixed_differences = analyze_sensor_agreement(
+        {max_value, 0.0}, {0.0, 0.0}, max_value);
+    require(std::isfinite(mixed_differences.mean_absolute_difference) &&
+                mixed_differences.mean_absolute_difference == max_value / 2.0,
+            "mixed large differences must have a finite mean");
+
+    bool overflowing_difference_rejected = false;
+    try {
+        (void)analyze_sensor_agreement({max_value}, {-max_value}, max_value);
+    } catch (const std::overflow_error&) {
+        overflowing_difference_rejected = true;
+    }
+    require(overflowing_difference_rejected,
+            "unrepresentable sensor differences must be rejected");
+
     std::cout << "sensor agreement analysis passed\n";
     return 0;
 }

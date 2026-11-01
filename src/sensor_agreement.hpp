@@ -28,7 +28,7 @@ inline SensorAgreementAnalysis analyze_sensor_agreement(
         return {0, 0.0, 0.0, 0.0, false};
     }
 
-    double total_difference = 0.0;
+    double mean_difference = 0.0;
     double max_difference = 0.0;
     std::size_t disagreements = 0;
 
@@ -38,7 +38,10 @@ inline SensorAgreementAnalysis analyze_sensor_agreement(
         }
 
         const double difference = std::abs(primary[i] - redundant[i]);
-        total_difference += difference;
+        if (!std::isfinite(difference)) {
+            throw std::overflow_error("sensor difference exceeds finite range");
+        }
+        mean_difference += (difference - mean_difference) / static_cast<double>(i + 1);
         max_difference = std::max(max_difference, difference);
         if (difference > tolerance) {
             ++disagreements;
@@ -50,7 +53,7 @@ inline SensorAgreementAnalysis analyze_sensor_agreement(
 
     return {
         primary.size(),
-        total_difference / static_cast<double>(primary.size()),
+        mean_difference,
         max_difference,
         disagreement_rate,
         disagreement_rate >= 0.20,
