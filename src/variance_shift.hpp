@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <cmath>
 #include <stdexcept>
 #include <vector>
@@ -16,21 +17,28 @@ inline double population_stddev(const std::vector<double>& values) {
         throw std::invalid_argument("at least two samples are required");
     }
 
-    double mean = 0.0;
+    long double scale = 0.0L;
     for (double value : values) {
         if (!std::isfinite(value)) {
             throw std::invalid_argument("samples must be finite");
         }
-        mean += value;
+        scale = std::max(scale, std::fabs(static_cast<long double>(value)));
     }
-    mean /= static_cast<double>(values.size());
+    if (scale == 0.0L) {
+        return 0.0;
+    }
 
-    double squared_error = 0.0;
+    long double mean = 0.0L;
+    long double squared_deviations = 0.0L;
+    std::size_t count = 0;
     for (double value : values) {
-        const double delta = value - mean;
-        squared_error += delta * delta;
+        const long double normalized = static_cast<long double>(value) / scale;
+        const long double delta = normalized - mean;
+        mean += delta / static_cast<long double>(++count);
+        squared_deviations += delta * (normalized - mean);
     }
-    return std::sqrt(squared_error / static_cast<double>(values.size()));
+    const long double variance = std::max(0.0L, squared_deviations / static_cast<long double>(count));
+    return static_cast<double>(std::sqrt(variance) * scale);
 }
 
 inline VarianceShiftReport analyze_variance_shift(
@@ -38,7 +46,8 @@ inline VarianceShiftReport analyze_variance_shift(
     const std::vector<double>& recent,
     double ratio_threshold = 2.0,
     double minimum_stddev = 1e-9) {
-    if (ratio_threshold <= 1.0 || minimum_stddev <= 0.0) {
+    if (!std::isfinite(ratio_threshold) || !std::isfinite(minimum_stddev) ||
+        ratio_threshold <= 1.0 || minimum_stddev <= 0.0) {
         throw std::invalid_argument("invalid variance shift settings");
     }
 
