@@ -27,6 +27,21 @@ int main() {
     } catch (const std::invalid_argument&) {
     }
 
+    const double large = 1e308;
+    const auto large_rising = analyze_sensor_drift({-large, 0.0, large}, 1e307);
+    if (!large_rising.sustained_drift || !std::isfinite(large_rising.slope_per_sample) ||
+        std::abs(large_rising.slope_per_sample / large - 1.0) > 1e-12 ||
+        std::abs(large_rising.r_squared - 1.0) > 1e-12) return 6;
+
+    const auto large_stable = analyze_sensor_drift({large, large, large}, 1.0);
+    if (large_stable.sustained_drift || large_stable.slope_per_sample != 0.0 ||
+        large_stable.r_squared != 0.0) return 7;
+
+    const auto large_offset = analyze_sensor_drift(
+        {large, large + 1e293, large + 2e293}, 1e291);
+    if (!large_offset.sustained_drift || !std::isfinite(large_offset.r_squared) ||
+        large_offset.r_squared < 0.99) return 8;
+
     std::cout << "sensor drift checks passed\n";
     return 0;
 }
