@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <stdexcept>
@@ -32,30 +33,32 @@ inline DriftResult analyze_sensor_drift(
         }
     }
 
-    const double n = static_cast<double>(values.size());
-    const double mean_x = (n - 1.0) / 2.0;
-    double mean_y = 0.0;
-    for (double value : values) mean_y += value;
-    mean_y /= n;
+    const long double n = static_cast<long double>(values.size());
+    const long double mean_x = (n - 1.0L) / 2.0L;
+    long double mean_y = 0.0L;
+    for (double value : values) mean_y += static_cast<long double>(value) / n;
 
-    double covariance = 0.0;
-    double variance_x = 0.0;
-    double variance_y = 0.0;
+    long double covariance = 0.0L;
+    long double variance_x = 0.0L;
+    long double variance_y = 0.0L;
     for (std::size_t i = 0; i < values.size(); ++i) {
-        const double dx = static_cast<double>(i) - mean_x;
-        const double dy = values[i] - mean_y;
+        const long double dx = static_cast<long double>(i) - mean_x;
+        const long double dy = static_cast<long double>(values[i]) - mean_y;
         covariance += dx * dy;
         variance_x += dx * dx;
         variance_y += dy * dy;
     }
 
-    const double slope = covariance / variance_x;
-    double r_squared = 0.0;
-    if (variance_y > 0.0) {
-        r_squared = (covariance * covariance) / (variance_x * variance_y);
+    const long double slope = covariance / variance_x;
+    long double r_squared = 0.0L;
+    if (variance_y > 0.0L) {
+        r_squared = (covariance / variance_x) * (covariance / variance_y);
     }
+    r_squared = std::clamp(r_squared, 0.0L, 1.0L);
 
-    const double total_change = values.back() - values.front();
+    const long double total_change = static_cast<long double>(values.back()) -
+                                     static_cast<long double>(values.front());
     const bool sustained = std::fabs(slope) >= slope_threshold && r_squared >= minimum_r_squared;
-    return {slope, total_change, r_squared, sustained};
+    return {static_cast<double>(slope), static_cast<double>(total_change),
+            static_cast<double>(r_squared), sustained};
 }
