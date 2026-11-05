@@ -55,9 +55,17 @@ int main() {
     }
 
     const double max_value = std::numeric_limits<double>::max();
+    const auto finite_difference = telemetry::analyze_rate_of_change(
+        -max_value, max_value, 2.0, max_value);
+    if (!std::isfinite(finite_difference.per_second) ||
+        finite_difference.per_second != max_value || !finite_difference.rapid_change) {
+        std::cerr << "large difference with finite rate should be accepted\n";
+        return 1;
+    }
+
     try {
-        telemetry::analyze_rate_of_change(-max_value, max_value, 2.0, 1.0);
-        std::cerr << "overflowing telemetry difference should be rejected\n";
+        telemetry::analyze_rate_of_change(-max_value, max_value, 0.5, 1.0);
+        std::cerr << "rate outside double range should be rejected\n";
         return 1;
     } catch (const std::overflow_error&) {
     }
