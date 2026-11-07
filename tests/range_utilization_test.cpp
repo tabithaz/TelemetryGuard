@@ -1,6 +1,7 @@
 #include "../src/range_utilization.hpp"
 
 #include <stdexcept>
+#include <limits>
 
 int main() {
     const auto healthy = analyze_range_utilization({1.0, 4.0, 8.0}, 0.0, 10.0);
@@ -16,6 +17,16 @@ int main() {
         analyze_range_utilization({}, 0.0, 10.0);
         return 4;
     } catch (const std::invalid_argument&) {
+    }
+
+    for (double invalid : {std::numeric_limits<double>::quiet_NaN(),
+                           std::numeric_limits<double>::infinity(),
+                           -std::numeric_limits<double>::infinity()}) {
+        try {
+            analyze_range_utilization({1.0, 2.0}, 0.0, 10.0, invalid);
+            return 5;
+        } catch (const std::invalid_argument&) {
+        }
     }
 
     return 0;
