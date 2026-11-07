@@ -25,8 +25,9 @@ inline RangeUtilizationReport analyze_range_utilization(
         expected_minimum >= expected_maximum) {
         throw std::invalid_argument("expected range must be finite and increasing");
     }
-    if (minimum_utilization_ratio < 0.0 || minimum_utilization_ratio > 1.0) {
-        throw std::invalid_argument("minimum utilization ratio must be between zero and one");
+    if (!std::isfinite(minimum_utilization_ratio) ||
+        minimum_utilization_ratio < 0.0 || minimum_utilization_ratio > 1.0) {
+        throw std::invalid_argument("minimum utilization ratio must be finite and between zero and one");
     }
 
     double minimum = samples.front();
