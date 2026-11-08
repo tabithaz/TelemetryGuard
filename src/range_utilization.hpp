@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <stdexcept>
 #include <vector>
 
@@ -40,9 +41,15 @@ inline RangeUtilizationReport analyze_range_utilization(
         maximum = std::max(maximum, sample);
     }
 
-    const double observed_span = maximum - minimum;
-    const double expected_span = expected_maximum - expected_minimum;
-    const double utilization = observed_span / expected_span;
+    const long double wide_observed_span = static_cast<long double>(maximum) -
+                                           static_cast<long double>(minimum);
+    const long double wide_expected_span = static_cast<long double>(expected_maximum) -
+                                           static_cast<long double>(expected_minimum);
+    if (wide_observed_span > static_cast<long double>(std::numeric_limits<double>::max())) {
+        throw std::overflow_error("observed span exceeds finite range");
+    }
+    const double observed_span = static_cast<double>(wide_observed_span);
+    const double utilization = static_cast<double>(wide_observed_span / wide_expected_span);
 
     return {
         minimum,
