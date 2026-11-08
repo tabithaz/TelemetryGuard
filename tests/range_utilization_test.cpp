@@ -29,5 +29,17 @@ int main() {
         }
     }
 
+    const double huge = std::numeric_limits<double>::max();
+    const auto finite = analyze_range_utilization({-huge / 4, huge / 4},
+                                                  -huge, huge, 0.20);
+    if (!std::isfinite(finite.utilization_ratio) ||
+        finite.utilization_ratio != 0.25 || finite.degraded) return 6;
+
+    try {
+        analyze_range_utilization({-huge, huge}, -huge, huge);
+        return 7;
+    } catch (const std::overflow_error&) {
+    }
+
     return 0;
 }
