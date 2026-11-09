@@ -41,5 +41,16 @@ int main() {
     } catch (const std::overflow_error&) {
     }
 
+
+    try {
+        analyze_range_utilization({0.0, 1.0}, 0.0,
+                                  std::numeric_limits<double>::denorm_min());
+        return 8;
+    } catch (const std::overflow_error&) {
+    }
+
+    const auto small_ratio = analyze_range_utilization({0.0, 1.0}, 0.0, 2.0);
+    if (small_ratio.utilization_ratio != 0.5 || small_ratio.degraded) return 9;
+
     return 0;
 }

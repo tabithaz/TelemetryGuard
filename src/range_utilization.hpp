@@ -49,7 +49,11 @@ inline RangeUtilizationReport analyze_range_utilization(
         throw std::overflow_error("observed span exceeds finite range");
     }
     const double observed_span = static_cast<double>(wide_observed_span);
-    const double utilization = static_cast<double>(wide_observed_span / wide_expected_span);
+    const long double wide_utilization = wide_observed_span / wide_expected_span;
+    if (wide_utilization > static_cast<long double>(std::numeric_limits<double>::max())) {
+        throw std::overflow_error("utilization ratio exceeds finite range");
+    }
+    const double utilization = static_cast<double>(wide_utilization);
 
     return {
         minimum,
