@@ -41,19 +41,21 @@ inline RangeUtilizationReport analyze_range_utilization(
         maximum = std::max(maximum, sample);
     }
 
-    const long double wide_observed_span = static_cast<long double>(maximum) -
-                                           static_cast<long double>(minimum);
-    const long double wide_expected_span = static_cast<long double>(expected_maximum) -
-                                           static_cast<long double>(expected_minimum);
-    if (wide_observed_span > static_cast<long double>(std::numeric_limits<double>::max())) {
+    // Calculate in double without assuming extended-precision long double
+    // is available. Half-width ratios avoid overflow when only the
+    // *expected* span exceeds the double range.
+    const double observed_span = maximum - minimum;
+    if (!std::isfinite(observed_span)) {
         throw std::overflow_error("observed span exceeds finite range");
     }
-    const double observed_span = static_cast<double>(wide_observed_span);
-    const long double wide_utilization = wide_observed_span / wide_expected_span;
-    if (wide_utilization > static_cast<long double>(std::numeric_limits<double>::max())) {
+    const double expected_span = expected_maximum - expected_minimum;
+    const double utilization = std::isfinite(expected_span)
+        ? observed_span / expected_span
+        : (maximum / 2.0 - minimum / 2.0) /
+          (expected_maximum / 2.0 - expected_minimum / 2.0);
+    if (!std::isfinite(utilization)) {
         throw std::overflow_error("utilization ratio exceeds finite range");
     }
-    const double utilization = static_cast<double>(wide_utilization);
 
     return {
         minimum,
