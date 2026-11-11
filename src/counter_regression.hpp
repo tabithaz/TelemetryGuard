@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <limits>
 #include <stdexcept>
 #include <vector>
 
@@ -29,8 +30,11 @@ inline CounterRegressionReport analyze_counter_regressions(
         if (i == 0 || values[i] >= values[i - 1]) continue;
         const bool expected_reset = values[i] >= reset_floor && values[i] <= reset_ceiling;
         if (!expected_reset) {
+            const long double drop = static_cast<long double>(values[i - 1]) - static_cast<long double>(values[i]);
+            if (drop > static_cast<long double>(std::numeric_limits<double>::max()))
+                throw std::invalid_argument("counter regression magnitude exceeds double range");
             ++regressions;
-            largest_regression = std::max(largest_regression, values[i - 1] - values[i]);
+            largest_regression = std::max(largest_regression, static_cast<double>(drop));
         }
     }
     const std::size_t transitions = values.size() > 1 ? values.size() - 1 : 0;
