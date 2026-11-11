@@ -1,5 +1,6 @@
 #include "counter_regression.hpp"
 #include <cassert>
+#include <limits>
 #include <stdexcept>
 
 int main() {
@@ -15,5 +16,13 @@ int main() {
     bool threw = false;
     try { analyze_counter_regressions({1, 2}, 2, 1); } catch (const std::invalid_argument&) { threw = true; }
     assert(threw);
+    const double extreme = 1e308;
+    threw = false;
+    try { analyze_counter_regressions({extreme, -extreme}); }
+    catch (const std::invalid_argument&) { threw = true; }
+    assert(threw);
+
+    const auto expected_reset_extreme = analyze_counter_regressions({extreme, 0.0});
+    assert(expected_reset_extreme.regressions == 0);
     return 0;
 }
