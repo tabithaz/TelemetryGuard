@@ -29,15 +29,17 @@ inline RateOfChange analyze_rate_of_change(
         throw std::invalid_argument("rapid change threshold must be finite and non-negative");
     }
 
-    // Keep intermediate differences in extended precision when the final rate fits.
-    const long double delta = static_cast<long double>(current_value) -
-                              static_cast<long double>(previous_value);
-    const long double wide_rate = delta / static_cast<long double>(elapsed_seconds);
-    if (!std::isfinite(wide_rate) ||
-        std::abs(wide_rate) > static_cast<long double>(std::numeric_limits<double>::max())) {
+    // Avoid depending on long double having a wider exponent range than double.
+    // On Apple Clang, long double may have the same range as double.
+    const double delta = current_value - previous_value;
+    // If subtraction overflows, halving both sides preserves a finite rate
+    // whenever the final quotient is representable.
+    const double rate = std::isfinite(delta)
+        ? delta / elapsed_seconds
+        : (current_value / 2.0 - previous_value / 2.0) / (elapsed_seconds / 2.0);
+    if (!std::isfinite(rate)) {
         throw std::overflow_error("rate of change exceeds finite range");
     }
-    const double rate = static_cast<double>(wide_rate);
     const double absolute_rate = std::abs(rate);
     return RateOfChange{
         rate,
