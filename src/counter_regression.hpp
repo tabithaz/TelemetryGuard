@@ -39,5 +39,5 @@ inline CounterRegressionReport analyze_counter_regressions(
     }
     const std::size_t transitions = values.size() > 1 ? values.size() - 1 : 0;
     const double rate = transitions ? 100.0 * static_cast<double>(regressions) / static_cast<double>(transitions) : 0.0;
-    return {values.size(), regressions, largest_regression, rate, rate >= degraded_rate_percent};
+    return {values.size(), regressions, largest_regression, rate, regressions > 0 && rate >= degraded_rate_percent};
 }
