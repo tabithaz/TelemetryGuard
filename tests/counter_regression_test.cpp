@@ -34,5 +34,37 @@ int main() {
 
     const auto expected_reset_extreme = analyze_counter_regressions({extreme, 0.0});
     assert(expected_reset_extreme.regressions == 0);
+    // Regression rate is measured over transitions, with an inclusive threshold.
+    const auto threshold_equal = analyze_counter_regressions({10, 9, 10, 9, 10}, 0, 1, 50);
+    assert(threshold_equal.regressions == 2 && threshold_equal.regression_rate_percent == 50);
+    assert(threshold_equal.degraded);
+    const auto threshold_above = analyze_counter_regressions({10, 9, 10, 9, 10}, 0, 1, 50.01);
+    assert(!threshold_above.degraded);
+    const auto all_regressions = analyze_counter_regressions({10, 9, 8}, 0, 1, 100);
+    assert(all_regressions.degraded && all_regressions.regression_rate_percent == 100);
+
+    // Only drops into the configured reset interval are exempt.
+    const auto custom_resets = analyze_counter_regressions({10, 5, 10, 6, 10, 4}, 5, 6, 1);
+    assert(custom_resets.regressions == 1 && custom_resets.largest_regression == 6);
+
+    // Non-finite samples and thresholds must fail closed.
+    for (double invalid : {std::numeric_limits<double>::quiet_NaN(),
+                           std::numeric_limits<double>::infinity(),
+                           -std::numeric_limits<double>::infinity()}) {
+        threw = false;
+        try { analyze_counter_regressions({1, invalid}); }
+        catch (const std::invalid_argument&) { threw = true; }
+        assert(threw);
+        threw = false;
+        try { analyze_counter_regressions({1, 2}, 0, 1, invalid); }
+        catch (const std::invalid_argument&) { threw = true; }
+        assert(threw);
+    }
+    for (double invalid : {-0.01, 100.01}) {
+        threw = false;
+        try { analyze_counter_regressions({1, 2}, 0, 1, invalid); }
+        catch (const std::invalid_argument&) { threw = true; }
+        assert(threw);
+    }
     return 0;
 }
